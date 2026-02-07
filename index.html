@@ -83,8 +83,9 @@ label.btn{gap:8px}
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket (STABLE)</div>
+  <div class="h1">LyricsPocket (STABLE v1.1)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
+<div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（その場合は OPEN(翻訳) でGoogle翻訳へ送れます）。</div>
 
   <div class="pane">
     <div class="head">
@@ -96,6 +97,8 @@ label.btn{gap:8px}
         <button id="btnNext" class="btn">NEXT</button>
         <button id="btnList" class="btn">LIST</button>
         <button id="btnJP" class="pill on" type="button">JP: ON</button>
+<button id="btnTestJP" class="btn">TEST JP</button>
+<a id="btnOpenGT" class="btn" href="#" style="text-decoration:none">OPEN(翻訳)</a>
       </div>
     </div>
     <div class="body">
@@ -157,6 +160,8 @@ var btnPrev = $("btnPrev");
 var btnNext = $("btnNext");
 var btnList = $("btnList");
 var btnJP = $("btnJP");
+var btnTestJP = $("btnTestJP");
+var btnOpenGT = $("btnOpenGT");
 
 var tracks = []; // {name, url, file}
 var trackIndex = -1;
@@ -172,8 +177,21 @@ var listOn = true;
 function setStatus(t){
   statusEl.textContent = String(t);
 }
+function updateOpenLink(en){
+  try{
+    var text = String(en||"").trim();
+    if (!text){ btnOpenGT.href = "#"; btnOpenGT.classList.add("disabled"); return; }
+    var url = "https://translate.google.com/?sl=en&tl=ja&text=" + encodeURIComponent(text) + "&op=translate";
+    btnOpenGT.href = url;
+    btnOpenGT.target = "_blank";
+    btnOpenGT.rel = "noopener";
+    btnOpenGT.classList.remove("disabled");
+  }catch(e){}
+}
+
 function setCur(en, jp){
   curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + (jp||"");
+  updateOpenLink(en);
 }
 
 function baseName(name){
@@ -432,7 +450,7 @@ function maybeTranslateLine(i){
       setStatus("OK");
     })
     .catch(function(){
-      setStatus("TRANSLATE FAILED (OPENでGoogle翻訳へ)");
+      setStatus("TRANSLATE FAILED (ネット/CORS/制限の可能性。OPEN(翻訳)でGoogle翻訳へ)");
     });
 }
 
@@ -443,6 +461,22 @@ function toggleJP(){
   if (!currentLines.length) return;
   // refresh current
   if (currentLineIndex>=0) highlightLine(currentLineIndex);
+}
+
+
+function testJP(){
+  var q = "hello";
+  setStatus("TEST TRANSLATING...");
+  fetch("https://api.mymemory.translated.net/get?q="+encodeURIComponent(q)+"&langpair=en|ja")
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var txt = "";
+      try{ txt = (j && j.responseData && j.responseData.translatedText) ? String(j.responseData.translatedText) : ""; }catch(e){}
+      setStatus("TEST OK: " + (txt || "(empty)"));
+    })
+    .catch(function(err){
+      setStatus("TEST FAILED: " + String(err || "") + " (CORS/ネットの可能性)");
+    });
 }
 
 function toggleList(){
@@ -494,6 +528,7 @@ inLyrics.addEventListener("change", function(){
       if (left<=0){
         setStatus("LYRICS READY: " + lyricsMap.size);
         renderLyricList();
+updateOpenLink("");
         // if track selected, try auto pick
         if (trackIndex>=0 && tracks[trackIndex]){
           autoPickLyricsForTrack(tracks[trackIndex].name);
@@ -505,6 +540,7 @@ inLyrics.addEventListener("change", function(){
       if (left<=0){
         setStatus("LYRICS READY: " + lyricsMap.size);
         renderLyricList();
+updateOpenLink("");
       }
     };
     reader.readAsText(f);
@@ -572,6 +608,8 @@ btnNext.addEventListener("click", function(){
 
 btnList.addEventListener("click", toggleList);
 btnJP.addEventListener("click", toggleJP);
+btnTestJP && btnTestJP.addEventListener("click", testJP);
+btnOpenGT && btnOpenGT.addEventListener("click", function(e){ if (btnOpenGT.classList.contains("disabled")) e.preventDefault(); });
 
 // follow lyrics with time
 audioEl.addEventListener("timeupdate", function(){
@@ -586,9 +624,10 @@ audioEl.addEventListener("timeupdate", function(){
 });
 
 // initial UI
-setStatus("JS OK (STABLE)");
+setStatus("JS OK (STABLE v1.1)");
 renderTrackList();
 renderLyricList();
+updateOpenLink("");
 </script>
 </body>
 </html>
