@@ -652,7 +652,11 @@ btnPlay.addEventListener("click", async () => {
 
 btnPrev.addEventListener("click", () => {
   if (!tracks.length) return;
-  const pi = (currentIndex < 0) ? 0 : Math.max(0, currentIndex - 1);
+  let pi;
+  if (currentIndex < 0) pi = 0;
+  else if (currentIndex <= 0) pi = tracks.length - 1; // wrap
+  else pi = currentIndex - 1;
+
   selectTrack(pi);
   audio.play().catch(()=>{});
   updatePlayButton();
@@ -660,7 +664,11 @@ btnPrev.addEventListener("click", () => {
 
 btnNext.addEventListener("click", () => {
   if (!tracks.length) return;
-  const ni = (currentIndex < 0) ? 0 : Math.min(tracks.length - 1, currentIndex + 1);
+  let ni;
+  if (currentIndex < 0) ni = 0;
+  else if (currentIndex >= tracks.length - 1) ni = 0; // wrap
+  else ni = currentIndex + 1;
+
   selectTrack(ni);
   audio.play().catch(()=>{});
   updatePlayButton();
