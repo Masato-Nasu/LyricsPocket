@@ -72,53 +72,14 @@ label.btn{gap:8px}
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket (v1.3 NO-SW)</div>
+  <div class="h1">LyricsPocket v1.3 (MINIMAL)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
-<div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（環境によって失敗する場合があります）。</div>
+<div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（その場合は OPEN(Google翻訳) でGoogle翻訳へ送れます）。</div>
 
-  <div class="pane">
-    <div class="head">
-      <div class="row" style="flex:1">
-        <label for="inAudio" class="btn primary">AUDIOを選ぶ</label>
-        <label for="inLyrics" class="btn">LYRICSを選ぶ</label>
-        <button id="btnPlay" class="btn ok">PLAY</button>
-        <button id="btnPrev" class="btn">PREV</button>
-        <button id="btnNext" class="btn">NEXT</button>
-        <button id="btnList" class="btn">LIST</button>
-        <button id="btnJP" class="pill on" type="button">JP: ON</button>
-</div>
-    </div>
-    <div class="body">
-      <div id="chipTrack" class="pill off" style="display:inline-flex">TRACK: (未選択)</div>
-      <div style="height:10px"></div>
-      <audio id="audio" controls playsinline></audio>
-      <div id="audState" class="small" style="margin-top:8px">audio: (idle)</div>
-      <div style="height:10px"></div>
-      <div id="status" class="status">READY</div>
-      <div style="height:10px"></div>
-      <div id="curLine" class="status">EN:
-JP:</div>
-    </div>
-
-    <div id="panelLists" class="body">
-      <div class="small">TRACKS</div>
-      <div id="trackList" class="list"></div>
-      <div style="height:12px"></div>
-      <div class="small">LYRICS</div>
-      <div id="lyricList" class="list"></div>
-      <div class="small" style="margin-top:10px">曲と歌詞が自動一致しない場合：曲を選んでから、下のLYRICSをタップして切り替えてください（端末に保存します）。</div>
-    </div>
-
-    <div id="panelLyrics" class="list"></div>
-  </div>
-
-  <div class="pane">
-    <div class="head">
-      <div style="font-weight:700">SW / リセット</div>
-    </div>
-    <div class="body">
-      <a class="btn danger" href="#">SW & Cache を消す（白画面対策）</a>
+  <div class="body">
+      <a class="btn danger" href="#"></a>
       <div class="small" style="margin-top:10px">※ 反映がおかしい／真っ白になる場合は、上のボタン→戻る→再読み込み。</div>
+<hr>
 
     </div>
   </div>
@@ -137,7 +98,6 @@ var inAudio = $("inAudio");
 var inLyrics = $("inLyrics");
 var audioEl = $("audio");
 var statusEl = $("status");
-var audStateEl = $("audState");
 var curLineEl = $("curLine");
 var chipTrack = $("chipTrack");
 var trackListEl = $("trackList");
@@ -163,24 +123,12 @@ var currentLineIndex = -1;
 var jpOn = true;
 var listOn = true;
 
-function setAudState(){
-  try{
-    if (!audStateEl) return;
-    var rs = audioEl.readyState;
-    var ns = audioEl.networkState;
-    var dur = isFinite(audioEl.duration) ? audioEl.duration.toFixed(2) : "NaN";
-    var ct = isFinite(audioEl.currentTime) ? audioEl.currentTime.toFixed(2) : "NaN";
-    var src = audioEl && audioEl.src ? (audioEl.src.startsWith("blob:") ? "blob" : audioEl.src) : "(none)";
-    var err = audioEl.error ? ("errCode=" + audioEl.error.code) : "";
-    audStateEl.textContent = "audio: paused=" + audioEl.paused + " rs=" + rs + " ns=" + ns + " t=" + ct + "/" + dur + " src=" + src + " " + err;
-  }catch(e){}
-}
-
 function setStatus(t){
   statusEl.textContent = String(t);
 }
 function setCur(en, jp){
   curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + (jp||"");
+  
 }
 
 function baseName(name){
@@ -321,9 +269,7 @@ function selectTrack(i){
   autoPickLyricsForTrack(tr.name);
   // set audio source but do not autoplay
   audioEl.src = tr.url;
-  try{ audioEl.preload = "auto"; }catch(e){}
   audioEl.load();
-  setAudState();
   renderTrackList();
   setStatus("TRACK READY: " + tr.name);
 }
@@ -450,7 +396,9 @@ function maybeTranslateLine(i){
   fetch("https://api.mymemory.translated.net/get?q="+encodeURIComponent(q)+"&langpair=en|ja")
     .then(function(r){
       var code = r && typeof r.status==="number" ? r.status : 0;
-      if (!r || !r.ok) throw new Error("HTTP " + String(code));
+      if (!r || !r.ok){
+        throw new Error("HTTP " + String(code));
+      }
       return r.json().then(function(j){ return {code:code, j:j}; });
     })
     .then(function(pack){
@@ -458,7 +406,8 @@ function maybeTranslateLine(i){
       var j = pack.j;
       var txt = "";
       try{
-        if (j && j.responseData && typeof j.responseData.translatedText === "string") txt = j.responseData.translatedText;
+        if (j && typeof j.translatedText === "string") txt = j.translatedText;
+        else if (j && j.responseData && typeof j.responseData.translatedText === "string") txt = j.responseData.translatedText;
       }catch(e){}
       txt = String(txt||"").trim();
       if (!txt) txt = "（翻訳が空でした）";
@@ -470,7 +419,7 @@ function maybeTranslateLine(i){
       setStatus("OK (" + String(code) + ")");
     })
     .catch(function(err){
-      ln.jp = "（翻訳失敗：ネット/CORS/制限の可能性）";
+      ln.jp = "（翻訳失敗：ネット/CORS/制限。OPENで翻訳）";
       var el = panelLyrics.querySelector('.lyLine[data-i="'+i+'"] .jp');
       if (el && jpOn) el.textContent = ln.jp || "";
       setCur(ln.en, ln.jp || "");
@@ -603,17 +552,11 @@ btnPlay.addEventListener("click", function(){
     setStatus("NO TRACK");
     return;
   }
-  try{ audioEl.muted = false; audioEl.volume = 1; }catch(e){}
-audioEl.play().then(function(){
+  audioEl.play().then(function(){
     setStatus("PLAYING");
-    setAudState();
     startSync();
   }).catch(function(err){
-    var n = (err && err.name) ? err.name : String(err||"");
-    setAudState();
-    if (n === "NotAllowedError") setStatus("PLAY BLOCKED: ①もう一度PLAY ②下のaudio▶︎を直接押す");
-    else if (n === "NotSupportedError") setStatus("PLAY FAILED: NotSupported (形式非対応の可能性。mp3推奨)");
-    else setStatus("PLAY FAILED: " + n);
+    setStatus("PLAY BLOCKED: " + String(err && err.name ? err.name : err));
   });
 });
 
@@ -630,24 +573,7 @@ btnNext.addEventListener("click", function(){
 });
 
 btnList.addEventListener("click", toggleList);
-
-// audio diagnostics
-audioEl.addEventListener("loadedmetadata", setAudState);
-audioEl.addEventListener("canplay", setAudState);
-audioEl.addEventListener("playing", setAudState);
-audioEl.addEventListener("pause", setAudState);
-audioEl.addEventListener("stalled", setAudState);
-audioEl.addEventListener("waiting", setAudState);
-audioEl.addEventListener("error", function(){
-  setAudState();
-  try{
-    var c = audioEl.error ? audioEl.error.code : 0;
-    setStatus("AUDIO ERROR code=" + String(c));
-  }catch(e){}
-});
-
 btnJP.addEventListener("click", toggleJP);
-// removed
 
 
 
@@ -683,8 +609,7 @@ audioEl.addEventListener("pause", stopSync);
 audioEl.addEventListener("ended", stopSync);
 
 // initial UI
-setStatus("JS OK (v1.3 NO-SW)");
-setAudState();
+setStatus("JS OK (v1.3 MINIMAL)");
 renderTrackList();
 renderLyricList();
 
