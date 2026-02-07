@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- SWRescue v4.1 DIAG: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- TrackRadio v1 DIAG: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -93,6 +93,13 @@ hr{border:none; border-top:1px solid var(--line); margin:12px 0}
 .item.current{background:rgba(255,255,255,.04)}
 .item.showjp .jp{display:block}
 
+.radioRow{display:flex;gap:10px;align-items:flex-start;padding:12px 12px;border-bottom:1px solid rgba(255,255,255,.07);}
+.radioRow input{margin-top:3px; transform:scale(1.2);}
+.radioRow .t{font-size:14px;line-height:1.35;word-break:break-word;}
+.radioRow.current{background:rgba(255,255,255,.04)}
+.radioRow:active{background:rgba(255,255,255,.06)}
+
+
 
 
 #errPanel{
@@ -135,7 +142,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">SWRescue v4.1 DIAG</span>
+      <span class="chip" style="opacity:.7">TrackRadio v1 DIAG</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -518,10 +525,24 @@ const trackList = $("trackList");
       const div = document.createElement("div");
       div.className = "item";
       div.style.cursor = "default";
-      div.innerHTML = `<div class="t" style="opacity:.75">曲が読み込めていません。FILES で mp3/m4a を選択してください。</div>`;
+      div.innerHTML = `<div class="t" style="opacity:.75">曲が読み込めていません。AUDIOを選ぶ で mp3/m4a を選択してください。</div>`;
       trackList.appendChild(div);
       return;
     }
+
+    tracks.forEach((t,i)=>{
+      const lab = document.createElement("label");
+      lab.className = "radioRow" + (i===trackIndex ? " current":"");
+      lab.innerHTML = `
+        <input type="radio" name="trackPick" value="${i}" ${i===trackIndex ? "checked":""}>
+        <div class="t">${escapeHTML(t.name.split("/").pop())}</div>
+      `;
+      trackList.appendChild(lab);
+    });
+
+    const label = (trackIndex>=0 && tracks[trackIndex]) ? tracks[trackIndex].name.split("/").pop() : "(未選択)";
+    curTrackChip.textContent = "TRACK: " + label;
+  }
     tracks.forEach((t,i)=>{
       const div = document.createElement("div");
       div.className = "item" + (i===trackIndex ? " current":"");
@@ -710,20 +731,11 @@ inFolder.addEventListener("change", () => {
 
   
   // Delegated track selection (more reliable on Android/PWA)
-  trackList.addEventListener("click", (e) => {
-    const item = e.target && e.target.closest ? e.target.closest(".item[data-i]") : null;
-    if (!item) return;
-    const i = Number(item.dataset.i);
     if (!Number.isFinite(i)) return;
     selectTrack(i, false);
     setStatus("TRACK SELECTED: " + (tracks[i]?.name.split("/").pop() || ""));
     diagSnapshot("TRACK_SELECTED");
   });
-
-  trackList.addEventListener("pointerup", (e) => {
-    const item = e.target && e.target.closest ? e.target.closest(".item[data-i]") : null;
-    if (!item) return;
-    const i = Number(item.dataset.i);
     if (!Number.isFinite(i)) return;
     selectTrack(i, false);
   });
@@ -732,6 +744,19 @@ inLyrics.addEventListener("change", () => {
     importLyricsFiles(Array.from(inLyrics.files || []));
     inLyrics.value = "";
   });
+
+  // Track selection via radio buttons (reliable on Android/PWA)
+  trackList.addEventListener("change", (e) => {
+    const el = e.target;
+    if (!el || el.name !== "trackPick") return;
+    const i = Number(el.value);
+    if (!Number.isFinite(i)) return;
+    selectTrack(i, false);
+    rebuildTrackList();
+    setStatus("TRACK SELECTED: " + (tracks[i]?.name.split("/").pop() || ""));
+    diagSnapshot("TRACK_SELECTED");
+  });
+
 selLyric.addEventListener("change", () => {
     // just selecting doesn't link yet; LINK button writes mapping
     const v = selLyric.value || "";
@@ -805,10 +830,10 @@ selLyric.addEventListener("change", () => {
   listEl.style.display = "block";
 
   // JS OK marker
-  setStatus("JS OK (SWRescue v4.1 DIAG)");
+  setStatus("JS OK (TrackRadio v1 DIAG)");
   try{ const c = (navigator.serviceWorker && navigator.serviceWorker.controller) ? "YES" : "NO"; setStatus("SW controller: " + c);
   try{ setStatus(`TRACKS: ${tracks.length} / LYRICS: ${lyricsByBase.size}`); }catch(_){ } }catch(_){ }
-  setStatus("READY (SWRescue v4.1 DIAG)");
+  setStatus("READY (TrackRadio v1 DIAG)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>
