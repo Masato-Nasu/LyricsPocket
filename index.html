@@ -83,9 +83,9 @@ label.btn{gap:8px}
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket (STABLE v1.1)</div>
+  <div class="h1">LyricsPocket (STABLE v1.2)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
-<div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（その場合は OPEN(翻訳) でGoogle翻訳へ送れます）。</div>
+<div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（その場合は OPEN(Google翻訳) でGoogle翻訳へ送れます）。</div>
 
   <div class="pane">
     <div class="head">
@@ -98,7 +98,8 @@ label.btn{gap:8px}
         <button id="btnList" class="btn">LIST</button>
         <button id="btnJP" class="pill on" type="button">JP: ON</button>
 <button id="btnTestJP" class="btn">TEST JP</button>
-<a id="btnOpenGT" class="btn" href="#" style="text-decoration:none">OPEN(翻訳)</a>
+<a id="btnOpenGT" class="btn" href="#" style="text-decoration:none">OPEN(Google翻訳)</a>
+<button id="btnCopyEN" class="btn" type="button">COPY EN</button>
       </div>
     </div>
     <div class="body">
@@ -131,6 +132,13 @@ JP:</div>
     <div class="body">
       <a class="btn danger" href="./kill-sw.html">SW & Cache を消す（白画面対策）</a>
       <div class="small" style="margin-top:10px">※ 反映がおかしい／真っ白になる場合は、上のボタン→戻る→再読み込み。</div>
+<hr>
+<div class="small">翻訳が出ない場合の対策：Proxy URL（任意）</div>
+<div class="row" style="margin-top:8px">
+  <input id="proxyUrl" placeholder="https://your-worker.example.com/translate" style="flex:1;min-width:260px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:#e5e7eb;padding:0 14px;font:inherit" />
+  <button id="btnSaveProxy" class="btn" type="button">SAVE</button>
+</div>
+<div class="small" style="margin-top:8px">空欄ならMyMemory直アクセス。企業Wi‑Fi等でブロックされる場合はProxy経由で回避できます。</div>
     </div>
   </div>
 
@@ -162,6 +170,10 @@ var btnList = $("btnList");
 var btnJP = $("btnJP");
 var btnTestJP = $("btnTestJP");
 var btnOpenGT = $("btnOpenGT");
+var btnCopyEN = $("btnCopyEN");
+var proxyUrlEl = $("proxyUrl");
+var btnSaveProxy = $("btnSaveProxy");
+
 
 var tracks = []; // {name, url, file}
 var trackIndex = -1;
@@ -207,6 +219,36 @@ function normalizeKey(name){
   s = s.replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9faf]+/g," ");
   s = s.replace(/\s+/g," ").trim();
   return s;
+}
+
+
+var proxyUrl = loadProxyUrl();
+
+function loadProxyUrl(){
+  try{
+    var u = localStorage.getItem("lp_translate_proxy") || "";
+    return String(u||"").trim();
+  }catch(e){ return ""; }
+}
+function saveProxyUrl(u){
+  try{
+    localStorage.setItem("lp_translate_proxy", String(u||"").trim());
+  }catch(e){}
+}
+function getTranslateEndpoint(){
+  var u = String(proxyUrl||"").trim();
+  return u;
+}
+function translateRequest(q){
+  var ep = getTranslateEndpoint();
+  if (ep){
+    // expected: GET ?q=... returns {translatedText:"..."} or MyMemory-like json
+    var url = ep + (ep.indexOf("?")>=0 ? "&" : "?") + "q=" + encodeURIComponent(q) + "&from=en&to=ja";
+    return fetch(url, {mode:"cors"});
+  }
+  // direct MyMemory
+  var url2 = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(q) + "&langpair=en|ja";
+  return fetch(url2);
 }
 
 function loadLinkMap(){
@@ -432,25 +474,41 @@ function maybeTranslateLine(i){
   var ln = currentLines[i];
   if (!ln.en) return;
   if (ln.jp) return;
-  // call MyMemory (no key)
   var q = ln.en.trim();
   if (!q) return;
+
   setStatus("TRANSLATING...");
-  fetch("https://api.mymemory.translated.net/get?q="+encodeURIComponent(q)+"&langpair=en|ja")
-    .then(function(r){ return r.json(); })
-    .then(function(j){
+  translateRequest(q)
+    .then(function(r){
+      var code = r && typeof r.status==="number" ? r.status : 0;
+      if (!r || !r.ok){
+        throw new Error("HTTP " + String(code));
+      }
+      return r.json().then(function(j){ return {code:code, j:j}; });
+    })
+    .then(function(pack){
+      var code = pack.code;
+      var j = pack.j;
       var txt = "";
-      try{ txt = (j && j.responseData && j.responseData.translatedText) ? String(j.responseData.translatedText) : ""; }catch(e){}
-      if (!txt) txt = "";
+      try{
+        if (j && typeof j.translatedText === "string") txt = j.translatedText;
+        else if (j && j.responseData && typeof j.responseData.translatedText === "string") txt = j.responseData.translatedText;
+      }catch(e){}
+      txt = String(txt||"").trim();
+      if (!txt) txt = "（翻訳が空でした）";
       ln.jp = txt;
-      // update line UI
+
       var el = panelLyrics.querySelector('.lyLine[data-i="'+i+'"] .jp');
       if (el && jpOn) el.textContent = ln.jp || "";
       setCur(ln.en, ln.jp || "");
-      setStatus("OK");
+      setStatus("OK (" + String(code) + ")");
     })
-    .catch(function(){
-      setStatus("TRANSLATE FAILED (ネット/CORS/制限の可能性。OPEN(翻訳)でGoogle翻訳へ)");
+    .catch(function(err){
+      ln.jp = "（翻訳失敗：ネット/CORS/制限。OPENで翻訳）";
+      var el = panelLyrics.querySelector('.lyLine[data-i="'+i+'"] .jp');
+      if (el && jpOn) el.textContent = ln.jp || "";
+      setCur(ln.en, ln.jp || "");
+      setStatus("TRANSLATE FAILED: " + String(err||""));
     });
 }
 
@@ -624,7 +682,7 @@ audioEl.addEventListener("timeupdate", function(){
 });
 
 // initial UI
-setStatus("JS OK (STABLE v1.1)");
+setStatus("JS OK (STABLE v1.2)");
 renderTrackList();
 renderLyricList();
 updateOpenLink("");
