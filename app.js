@@ -619,7 +619,7 @@ function selectTrack(index) {
   audio.src = t.url;
   audio.currentTime = 0;
   updatePlayButton();
-  setStatus(`${tracks.length} FILES LOADED | ${t.title}`);
+  setStatus(`${tracks.length} FILES LOADED | ${currentIndex+1}/${tracks.length} | ${t.title}`);
 
   let doc = trackLyrics.get(t.id);
   renderLyrics(doc || null);
@@ -652,6 +652,7 @@ btnPlay.addEventListener("click", async () => {
 
 btnPrev.addEventListener("click", () => {
   if (!tracks.length) return;
+  if (tracks.length < 2) { setStatus("ONLY 1 TRACK LOADED"); audio.currentTime = 0; audio.play().catch(()=>{}); return; }
   let pi;
   if (currentIndex < 0) pi = 0;
   else if (currentIndex <= 0) pi = tracks.length - 1; // wrap
@@ -664,6 +665,7 @@ btnPrev.addEventListener("click", () => {
 
 btnNext.addEventListener("click", () => {
   if (!tracks.length) return;
+  if (tracks.length < 2) { setStatus("ONLY 1 TRACK LOADED"); audio.currentTime = 0; audio.play().catch(()=>{}); return; }
   let ni;
   if (currentIndex < 0) ni = 0;
   else if (currentIndex >= tracks.length - 1) ni = 0; // wrap
