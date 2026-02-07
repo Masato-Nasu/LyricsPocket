@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=deepl2g">
+<link rel="manifest" href="./manifest.webmanifest?v=deepl2h">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -117,7 +117,8 @@ JP:</div>
       <div style="height:12px"></div>
       <div class="small">LYRICS</div>
       <div id="lyricList" class="list"></div>
-</div>
+      <div class="small" style="margin-top:10px">曲と歌詞が自動一致しない場合：曲を選んでから、下のLYRICSをタップして切り替えてください（端末に保存します）。</div>
+    </div>
 
     <div id="panelLyrics" class="list"></div>
   </div>
@@ -130,6 +131,7 @@ JP:</div>
 
 <script>
 
+try{ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); } }catch(e){}
 "use strict";
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -320,28 +322,34 @@ function clearTracks(){
 }
 
 
-function clearLyricsHard(){
-  lyricsMap = new Map();
-  lyricsLoaded = false;
-  currentLines = [];
-  currentLineIndex = -1;
-  try{ panelLyrics.innerHTML = ""; }catch(e){}
-  try{ lyricListEl.innerHTML = ""; }catch(e){}
+function lpClearLyrics(){
+  try{ lyricsMap = new Map(); }catch(e){}
+  try{ lyricsLoaded = false; }catch(e){}
+  try{ currentLines = []; currentLineIndex = -1; }catch(e){}
+  try{
+    // clear visible panels (names may differ across builds)
+    if (typeof panelLyrics !== "undefined" && panelLyrics) panelLyrics.innerHTML = "";
+  }catch(e){}
+  try{
+    if (typeof lyricListEl !== "undefined" && lyricListEl) lyricListEl.innerHTML = "";
+    if (typeof panelLyricList !== "undefined" && panelLyricList) panelLyricList.innerHTML = "";
+  }catch(e){}
   try{ setCur("",""); }catch(e){}
   try{ renderWordChips(""); }catch(e){}
 }
 
-function abortLyricReaders(){
+function lpAbortLyricReaders(){
   try{ for (const r of lyricReaders){ try{ r.abort(); }catch(e){} } }catch(e){}
   lyricReaders = [];
 }
 
-function resetLyricsOnAlbumSwitch(msg){
+function lpAlbumLyricReset(msg){
+  // invalidate late lyric loads from previous album
   albumSessionToken++;
-  abortLyricReaders();
-  try{ clearLyricsHard(); }catch(e){}
-  try{ linkMap = new Map(); localStorage.removeItem("lp_link_map_v13"); }catch(e){}
+  lpAbortLyricReaders();
+  lpClearLyrics();
   try{ inLyrics.value = ""; }catch(e){}
+  try{ linkMap = new Map(); localStorage.removeItem("lp_link_map_v13"); }catch(e){}
   if (msg) setStatus(msg);
 }
 
@@ -526,10 +534,8 @@ function stopSync(){
 }
 
 function selectTrack(i){
-  if (!lyricsLoaded){ try{ clearLyricsHard(); }catch(e){} }
-
   // If lyrics are not loaded for this album, never keep old lyrics visible
-  if (!lyricsLoaded){ try{ clearLyricsHard(); }catch(e){} }
+  if (!lyricsLoaded){ try{ clearLyrics(); }catch(e){} }
   if (!(i>=0 && i<tracks.length)) return;
   trackIndex = i;
   const tr = tracks[i];
@@ -740,8 +746,8 @@ try{
 
 inLyrics.addEventListener("change", ()=>{
   const tok = albumSessionToken;
-  abortLyricReaders();
-  clearLyricsHard();
+  lpAbortLyricReaders();
+  lpClearLyrics();
 
 const files = Array.from(inLyrics.files || []);
   if (!files.length){ inLyrics.value=""; return; }
@@ -912,7 +918,7 @@ window.addEventListener("unhandledrejection", (ev)=>{
 });
 
 // init
-setStatus("JS OK (deepl2g / play-safe lyric reset)");
+setStatus("JS OK (deepl2h / sw-kill + lyric reset)");
 setCur("","");
 renderWordChips("");
 renderTrackList();
