@@ -199,3 +199,7 @@ body{
 .lineItem.current .jpUnder{
   color:rgba(255,255,255,.72);
 }
+
+.chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+.chip{pointer-events:auto;}

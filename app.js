@@ -82,6 +82,17 @@ ${msg}`);
 audio.preload = "metadata";
 audio.playsInline = true;
 
+function syncOnlineButton(){
+  if (!btnOnlineTranslate) return;
+  btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
+  btnOnlineTranslate.classList.toggle("on", !!onlineTranslate);
+}
+
+function syncPlayButton(){
+  updatePlayButton();
+}
+
+
 // ---------- Utils ----------
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
@@ -622,7 +633,7 @@ function selectTrack(index) {
 }
 
 btnPlay.addEventListener("click", async () => {
-  if (!tracks.length) return;
+  if (!tracks.length) { alert("まずFILESで音声ファイルを選択してください。"); return; }
   if (currentIndex === -1) selectTrack(0);
   if (audio.paused) await safePlay();
   else audio.pause();
@@ -730,9 +741,18 @@ btnKeepAwake.addEventListener("click", async () => {
 // ---------- Online Translate toggle ----------
 btnOnlineTranslate.addEventListener("click", () => {
   onlineTranslate = !onlineTranslate;
-  btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
+  syncOnlineButton();
+  setStatus(`${tracks.length} FILES LOADED | ONLINE JP ${onlineTranslate ? "ON" : "OFF"}`);
   if (!onlineTranslate) {
     jpLine.textContent = "TAP A LINE TO TRANSLATE";
+    return;
+  }
+  // When ON: translate current displayed line if any (and also fill under-line if we know current id)
+  const enText = (srcLine.textContent || "").trim();
+  if (enText) {
+    jpLine.textContent = "TRANSLATING...";
+    // no lineId here because srcLine is derived from current highlight
+    translateToJP(enText, null);
   }
 });
 
