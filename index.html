@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- OneFileReset v4.1: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- SWRescue v1: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -111,6 +111,21 @@ hr{border:none; border-top:1px solid var(--line); margin:12px 0}
 .small{font-size:12px; color:var(--muted);}
 a{color:rgba(160,220,255,.95)}
 </style>
+
+<script>
+/* SWRescue: replace any broken SW with a "no-intercept" SW that does NOT cache and does NOT hijack fetch.
+   This is the safest way to escape a "white screen due to old SW" loop without relying on manual clearing.
+*/
+(async function(){
+  try{
+    if (!("serviceWorker" in navigator)) return;
+    // Register (or update) a clean SW. service worker script fetch is not intercepted by existing SW.
+    const reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+    try{ await reg.update(); }catch(_){}
+  }catch(e){}
+})();
+</script>
+
 </head>
 
 <body>
@@ -118,7 +133,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">OneFileReset v4.1</span>
+      <span class="chip" style="opacity:.7">SWRescue v1</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -731,8 +746,9 @@ a{color:rgba(160,220,255,.95)}
   listEl.style.display = "block";
 
   // JS OK marker
-  setStatus("JS OK (v4.1)");
-  setStatus("READY (OneFileReset v4.1)");
+  setStatus("JS OK (SWRescue v1)");
+  try{ const c = (navigator.serviceWorker && navigator.serviceWorker.controller) ? "YES" : "NO"; setStatus("SW controller: " + c); }catch(_){ }
+  setStatus("READY (SWRescue v1)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>
