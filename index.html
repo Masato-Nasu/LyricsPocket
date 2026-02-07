@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=fix6dc">
+<link rel="manifest" href="./manifest.webmanifest?v=fix6f">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -83,8 +83,11 @@ label.btn{gap:8px}
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket</div>
-<div class="pane">
+  <div class="h1">LyricsPocket v1.3 (FIX6f → TANGO-CHO)</div>
+  <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
+  <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります。</div>
+
+  <div class="pane">
     <div class="head">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1">
         <label for="inAudio" class="btn primary">AUDIOを選ぶ</label>
@@ -246,27 +249,56 @@ function pushInbox(word, example){
   }catch(e){}
 }
 
+function isAndroidUA(){
+  try{ return /Android/i.test(navigator.userAgent || ""); }catch(e){ return false; }
+}
+
+async function shareToTangoCho(word, example){
+  try{
+    if (!navigator.share) return false;
+    if (!isAndroidUA()) return false; // Share-targetは主にAndroid想定
+    const w = String(word||"").trim();
+    if (!w) return false;
+    const ex = String(example||"").trim();
+    const text = ex ? (w + "\n" + ex) : w;
+    await navigator.share({ title: "TANGO-CHO", text, url: TANGO_CHO_URL });
+    toast("SHARED (select TANGO-CHO)");
+    return true;
+  }catch(e){
+    // cancel / unsupported / error
+    return false;
+  }
+}
+
 function sendToTangoCho(word, example){
   try{
     const w = String(word||"").trim();
     if (!w) return;
     const ex = String(example||"").trim();
-    pushInbox(w, ex);
 
-    const u = new URL(TANGO_CHO_URL);
-    u.searchParams.set("word", w);
-    if (ex) u.searchParams.set("ex", ex);
-    u.searchParams.set("src", "lyricspocket");
-    const url = u.toString();
-    let opened = null;
-    try{ opened = window.open(url, "_blank"); }catch(e){}
-    if (opened){
-      // keep this page alive (state preserved)
-      toast("OPENED TANGO-CHO");
-    }else{
-      // fallback (may unload this page)
-      location.href = url;
-    }
+    // 1) まずはクリップボード（iOSでも確実）
+    try{
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(w).catch(()=>{});
+      }
+    }catch(e){}
+
+    // 2) Androidは「共有 → TANGO-CHO」を最優先（別ブラウザ/別プロファイル事故を避ける）
+    (async ()=>{
+      const shared = await shareToTangoCho(w, ex);
+      if (shared) return;
+
+      // 3) フォールバック：URLパラメータ（環境により、別インスタンスで開く場合あり）
+      pushInbox(w, ex); // 念のため（理解できる側があれば拾える）
+      const u = new URL(TANGO_CHO_URL);
+      u.searchParams.set("word", w);
+      if (ex) u.searchParams.set("ex", ex);
+      u.searchParams.set("src", "lyricspocket");
+      const url = u.toString();
+      let opened = null;
+      try{ opened = window.open(url, "_blank"); }catch(e){}
+      if (!opened) location.href = url;
+    })();
   }catch(e){
     toast("SEND FAILED");
   }
@@ -740,7 +772,7 @@ window.addEventListener("unhandledrejection", (ev)=>{
 });
 
 // init
-setStatus("JS OK (FIX6db TANGO)");
+setStatus("JS OK (FIX6f TANGO)");
 setCur("","");
 renderWordChips("");
 renderTrackList();
