@@ -21,7 +21,6 @@ const btnLyrics = $("btnLyrics");
 const btnList = $("btnList");
 
 const inputAudio = $("inputAudio");
-const inputDir = $("inputDir");
 const inputLyrics = $("inputLyrics");
 
 const dlgList = $("dlgList");
@@ -32,7 +31,7 @@ const btnKeepAwake = $("btnKeepAwake");
 const btnOnlineTranslate = $("btnOnlineTranslate");
 
 let wakeLock = null;
-let onlineTranslate = false; // default OFF
+let onlineTranslate = true; // default ON (show JP in-app)
 let translationCache = new Map(); // key: text -> jp
 let tracks = []; // {id, file, name, title, normBase}
 let lyricsFiles = []; // {file, name, normBase, kind}
@@ -221,6 +220,8 @@ function renderTrackList() {
       selectTrack(i);
       audio.play();
       updatePlayButton();
+btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
+
       showList(false);
     });
 
@@ -266,59 +267,72 @@ async function translateToJP(text) {
 
   srcLine.textContent = trimmed;
 
-  const openUrl =
-    "https://translate.google.com/?sl=en&tl=ja&text=" +
-    encodeURIComponent(trimmed) +
-    "&op=translate";
-
-  const linkHtml = ` <a href="${openUrl}" target="_blank" rel="noopener" style="color: rgba(255,255,255,.85); text-decoration: underline;">OPEN TRANSLATE</a>`;
-
-  // Offline mode: copy + provide a one-tap fallback link
+  // Always try to show JP in-app when ONLINE is ON
   if (!onlineTranslate) {
+    // offline mode: copy and tell user to use system translate
     try {
       await navigator.clipboard.writeText(trimmed);
-      jpLine.innerHTML = "COPIED. USE SYSTEM TRANSLATE." + linkHtml;
+      jpLine.textContent = "COPIED. USE SYSTEM TRANSLATE.";
     } catch (_) {
-      jpLine.innerHTML = "COPY FAILED. " + linkHtml;
+      jpLine.textContent = "COPY FAILED. SELECT & COPY.";
     }
     return;
   }
 
-  // Online translate mode (MyMemory) + graceful fallback
   if (translationCache.has(trimmed)) {
     jpLine.textContent = translationCache.get(trimmed);
     return;
   }
 
   jpLine.textContent = "TRANSLATING...";
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 8000);
+
   try {
     const url = new URL("https://api.mymemory.translated.net/get");
     url.searchParams.set("q", trimmed);
     url.searchParams.set("langpair", "en|ja");
 
-    const res = await fetch(url.toString(), {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      cache: "no-store"
-    });
-
+    const res = await fetch(url.toString(), { method: "GET", signal: ctrl.signal, cache: "no-store" });
     const data = await res.json();
 
-    // MyMemory sometimes returns responseStatus != 200 even if HTTP is 200
-    const status = Number(data?.responseStatus ?? 0);
     const jp = data?.responseData?.translatedText;
 
-    if (!res.ok || status !== 200 || !jp) {
-      const detail = data?.responseDetails ? String(data.responseDetails) : "";
-      jpLine.innerHTML =
-        `TRANSLATION FAILED (${res.status}/${status}) ${detail ? "- " + detail : ""}.` + linkHtml;
-      return;
-    }
+    // MyMemory sometimes returns warnings or echoes input when rate-limited.
+    if (!jp || jp.trim().length === 0) throw new Error("NO_TEXT");
+    if (jp.trim().toLowerCase() === trimmed.toLowerCase()) throw new Error("ECHO");
+    if (/MYMEMORY WARNING/i.test(jp)) throw new Error("WARNING");
 
     translationCache.set(trimmed, jp);
     jpLine.textContent = jp;
   } catch (e) {
-    jpLine.innerHTML = "TRANSLATION FAILED (NETWORK/CORS)." + linkHtml;
+    // Fallback: show action buttons (open translate / copy)
+    const q = encodeURIComponent(trimmed);
+    jpLine.innerHTML = `
+      <span class="mono faint">TRANSLATION FAILED.</span>
+      <button id="btnOpenTranslate" class="chip" style="margin-left:8px;">OPEN</button>
+      <button id="btnCopyLine" class="chip" style="margin-left:6px;">COPY</button>
+    `;
+    const btnOpen = document.getElementById("btnOpenTranslate");
+    const btnCopy = document.getElementById("btnCopyLine");
+
+    if (btnOpen) {
+      btnOpen.addEventListener("click", () => {
+        window.open(\`https://translate.google.com/?sl=en&tl=ja&text=${q}&op=translate\`, "_blank", "noopener");
+      }, { once: true });
+    }
+    if (btnCopy) {
+      btnCopy.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(trimmed);
+          btnCopy.textContent = "COPIED";
+        } catch (_) {
+          btnCopy.textContent = "FAIL";
+        }
+      }, { once: true });
+    }
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -382,44 +396,29 @@ async function importLyricsFiles(files) {
 
 // ---------- Folder import (progressive enhancement) ----------
 async function importFromFolder() {
-  // Best effort:
-  // 1) showDirectoryPicker (Chromium desktop / 일부 Android)
-  // 2) webkitdirectory file input (Android Chrome / Chromium)
-  // iOS: neither is reliable -> guide to FILES.
-  if (isIOS) {
-    alert("iPhone/iPadではフォルダ選択が未対応です。FILESで音声を複数選択してください。");
+  // showDirectoryPicker is part of File System Access API; not supported on iOS Safari/PWA
+  if (!("showDirectoryPicker" in window)) {
+    alert("このブラウザはフォルダ選択に未対応です。FILESで複数ファイルを選択してください。");
     return;
   }
+  try {
+    const dir = await window.showDirectoryPicker();
+    const audioCollected = [];
+    const lyricCollected = [];
 
-  if ("showDirectoryPicker" in window) {
-    try {
-      const dir = await window.showDirectoryPicker();
-      const audioCollected = [];
-      const lyricCollected = [];
-
-      for await (const entry of dir.values()) {
-        if (entry.kind !== "file") continue;
-        const file = await entry.getFile();
-        const e = ext(file.name);
-        if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || file.type.startsWith("audio/")) audioCollected.push(file);
-        if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
-      }
-
-      importAudioFiles(audioCollected);
-      await importLyricsFiles(lyricCollected);
-      return;
-    } catch (e) {
-      // user cancelled or not allowed -> fallback
+    for await (const entry of dir.values()) {
+      if (entry.kind !== "file") continue;
+      const file = await entry.getFile();
+      const e = ext(file.name);
+      if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || file.type.startsWith("audio/")) audioCollected.push(file);
+      if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
     }
-  }
 
-  // Fallback: directory upload input
-  if (inputDir) {
-    inputDir.click();
-    return;
+    importAudioFiles(audioCollected);
+    await importLyricsFiles(lyricCollected);
+  } catch (e) {
+    // user cancelled
   }
-
-  alert("この環境ではフォルダ選択が利用できません。FILES / LYRICS で読み込んでください。");
 }
 
 // ---------- Playback ----------
@@ -484,16 +483,6 @@ inputLyrics.addEventListener("change", async () => {
   await importLyricsFiles(files);
   inputLyrics.value = "";
 });
-
-// Directory upload (Android/Chromium fallback)
-if (inputDir) {
-  inputDir.addEventListener("change", async () => {
-    const files = Array.from(inputDir.files || []);
-    importAudioFiles(files);
-    await importLyricsFiles(files);
-    inputDir.value = "";
-  });
-}
 
 // LRC sync
 audio.addEventListener("timeupdate", () => {
