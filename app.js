@@ -1,4 +1,3 @@
-try{
 // LyricsPocket PWA (Minimal)
 // - Audio files: import via FILES (multiple). FOLDER uses showDirectoryPicker when supported.
 // - Lyrics files: import via LYRICS (txt/lrc). Auto-link by normalized base name.
@@ -722,4 +721,3 @@ btnOnlineTranslate.addEventListener("click", () => {
 
 // Initial
 updatePlayButton();
-}catch(e){ try{ const p=document.getElementById('errPanel'); if(p){ p.style.display='block'; p.textContent='APP ERROR\n'+(e&&e.stack?e.stack:String(e)); } }catch(_){} }
