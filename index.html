@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=fix6c">
+<link rel="manifest" href="./manifest.webmanifest?v=fix6d">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -83,7 +83,7 @@ label.btn{gap:8px}
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket v1.3 (FIX6cb → TANGO-CHO)</div>
+  <div class="h1">LyricsPocket v1.3 (FIX6db → TANGO-CHO)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
   <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります。</div>
 
@@ -260,7 +260,16 @@ function sendToTangoCho(word, example){
     u.searchParams.set("word", w);
     if (ex) u.searchParams.set("ex", ex);
     u.searchParams.set("src", "lyricspocket");
-    location.href = u.toString();
+    const url = u.toString();
+    let opened = null;
+    try{ opened = window.open(url, "_blank"); }catch(e){}
+    if (opened){
+      // keep this page alive (state preserved)
+      toast("OPENED TANGO-CHO");
+    }else{
+      // fallback (may unload this page)
+      location.href = url;
+    }
   }catch(e){
     toast("SEND FAILED");
   }
@@ -734,7 +743,7 @@ window.addEventListener("unhandledrejection", (ev)=>{
 });
 
 // init
-setStatus("JS OK (FIX6cb TANGO)");
+setStatus("JS OK (FIX6db TANGO)");
 setCur("","");
 renderWordChips("");
 renderTrackList();

@@ -1,7 +1,7 @@
 {
-  "name": "LyricsPocket (FIX6c clickable words)",
+  "name": "LyricsPocket (FIX6d keep state)",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=fix6c",
+  "start_url": "./index.html?v=fix6d",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
