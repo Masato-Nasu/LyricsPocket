@@ -1,7 +1,7 @@
 {
-  "name": "LyricsPocket FIX6 → TANGO-CHO (Clickable lyrics)",
+  "name": "LyricsPocket v1.3 (FIX6b clickable words)",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=fix6",
+  "start_url": "./index.html?v=fix6b",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
