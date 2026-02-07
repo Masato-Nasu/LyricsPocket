@@ -1,1 +1,1 @@
-/* SW disabled in v12 to prevent blank screens */
+/* NoSW build: service worker intentionally disabled. */

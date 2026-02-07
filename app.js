@@ -39,20 +39,8 @@ let lyricsFiles = []; // {file, name, normBase, kind}
 let trackLyrics = new Map(); // trackId -> {kind, lines[]}
 let currentIndex = -1;
 
-const audio = $("audioEl") || new Audio();
-audio.preload = "metadata";
-audio.playsInline = true;
-audio.volume = 1.0;
-
-audio.addEventListener("error", () => {
-  const err = audio.error;
-  const code = err ? err.code : 0;
-  setStatus(`AUDIO ERROR code=${code} (file may be unsupported)`);
-});
-audio.addEventListener("stalled", () => setStatus("AUDIO STALLED"));
-audio.addEventListener("waiting", () => setStatus("AUDIO BUFFERING..."));
-audio.addEventListener("playing", () => setStatus(`${tracks.length} FILES LOADED | PLAYING`));
-
+const audio = document.getElementById("audioEl");
+if (!audio) { alert("audioEl not found"); }
 
 // Robust play helper (avoids Android Chrome play()/pause() interruption crash overlays)
 async function safePlay() {
@@ -60,38 +48,25 @@ async function safePlay() {
     await audio.play();
     return true;
   } catch (e) {
-    const name = e?.name || "";
     const msg = String(e?.message || e || "");
-    setStatus(`PLAY FAILED: ${name || "Error"}`);
     // Common non-fatal race: play() interrupted by pause() / AbortError
-    if (/interrupted by a call to pause\(\)/i.test(msg) || /AbortError/i.test(name) || /AbortError/i.test(msg)) {
+    if (/interrupted by a call to pause\(\)/i.test(msg) || /AbortError/i.test(msg)) {
       await sleep(120);
-      try { await audio.play(); return true; } catch (_) { return false; }
+      try {
+        await audio.play();
+        return true;
+      } catch (_) {
+        setStatus("PLAY FAILED");
+    return false;
+      }
     }
-    // Autoplay / gesture restriction
-    if (/NotAllowedError/i.test(name) || /NotAllowedError/i.test(msg)) {
-      alert("再生がブロックされました。画面を一度タップしてから、PLAYを押してください。");
-      return false;
-    }
-    alert(`再生できません: ${name}
-${msg}`);
+    // NotAllowedError happens if user hasn't interacted yet
     return false;
   }
 }
 
 audio.preload = "metadata";
 audio.playsInline = true;
-
-function syncOnlineButton(){
-  if (!btnOnlineTranslate) return;
-  btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
-  btnOnlineTranslate.classList.toggle("on", !!onlineTranslate);
-}
-
-function syncPlayButton(){
-  updatePlayButton();
-}
-
 
 // ---------- Utils ----------
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
@@ -622,7 +597,6 @@ function selectTrack(index) {
   const t = tracks[index];
   audio.src = t.url;
   audio.currentTime = 0;
-  try{ audio.load(); }catch(_){ }
   updatePlayButton();
   setStatus(`${tracks.length} FILES LOADED | ${t.title}`);
 
@@ -633,7 +607,7 @@ function selectTrack(index) {
 }
 
 btnPlay.addEventListener("click", async () => {
-  if (!tracks.length) { alert("まずFILESで音声ファイルを選択してください。"); return; }
+  if (!tracks.length) return;
   if (currentIndex === -1) selectTrack(0);
   if (audio.paused) await safePlay();
   else audio.pause();
@@ -741,18 +715,9 @@ btnKeepAwake.addEventListener("click", async () => {
 // ---------- Online Translate toggle ----------
 btnOnlineTranslate.addEventListener("click", () => {
   onlineTranslate = !onlineTranslate;
-  syncOnlineButton();
-  setStatus(`${tracks.length} FILES LOADED | ONLINE JP ${onlineTranslate ? "ON" : "OFF"}`);
+  btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
   if (!onlineTranslate) {
     jpLine.textContent = "TAP A LINE TO TRANSLATE";
-    return;
-  }
-  // When ON: translate current displayed line if any (and also fill under-line if we know current id)
-  const enText = (srcLine.textContent || "").trim();
-  if (enText) {
-    jpLine.textContent = "TRANSLATING...";
-    // no lineId here because srcLine is derived from current highlight
-    translateToJP(enText, null);
   }
 });
 
