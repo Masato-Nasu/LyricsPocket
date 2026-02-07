@@ -35,10 +35,6 @@ input.fileBtn:active{ transform:translateY(1px); }
 </style>
 
 <script>
-/* SW Reset Guard: If a broken Service Worker is still controlling this scope, it can cause a blank screen
-   even after deploying a NoSW build. This script unregisters all SW registrations + clears caches once,
-   then hard-reloads. It runs only once per session (sessionStorage flag).
-*/
 (async function(){
   try{
     if (sessionStorage.getItem("lp_sw_reset_done")) return;
@@ -51,11 +47,8 @@ input.fileBtn:active{ transform:translateY(1px); }
       const keys = await caches.keys();
       await Promise.all(keys.map(k => caches.delete(k)));
     }
-    // Best-effort: clear SW-controlled requests by forcing reload
     location.replace(location.href.split("#")[0] + "?swreset=1");
-  }catch(e){
-    // If anything fails, keep going (do not block the app)
-  }
+  }catch(e){}
 })();
 </script>
 
@@ -85,12 +78,8 @@ input.fileBtn:active{ transform:translateY(1px); }
     p.style.display = "block";
     p.innerHTML = '<div class="t">APP ERROR</div>' + String(msg).replace(/[&<>]/g, s=>({ "&":"&amp;","<":"&lt;",">":"&gt;"}[s]));
   };
-  window.addEventListener("error", (e) => {
-    show((e && e.message) ? e.message : (e && e.error) ? String(e.error) : "Unknown error");
-  });
-  window.addEventListener("unhandledrejection", (e) => {
-    show("Unhandled Promise Rejection:\n" + (e.reason ? String(e.reason) : "Unknown"));
-  });
+  window.addEventListener("error", (e) => show(e?.message || String(e?.error || "Unknown error")));
+  window.addEventListener("unhandledrejection", (e) => show("Unhandled Promise Rejection:\n" + String(e?.reason || "Unknown")));
 })();
 </script>
 
@@ -144,8 +133,6 @@ input.fileBtn:active{ transform:translateY(1px); }
   </main>
 
   <script src="./app.js" type="module"></script>
-
-  <audio id="audioEl" preload="metadata" playsinline></audio>
 <div id="errPanel"></div>
 </body>
 </html>

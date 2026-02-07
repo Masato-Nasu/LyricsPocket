@@ -1,3 +1,4 @@
+try{
 // LyricsPocket PWA (Minimal)
 // - Audio files: import via FILES (multiple). FOLDER uses showDirectoryPicker when supported.
 // - Lyrics files: import via LYRICS (txt/lrc). Auto-link by normalized base name.
@@ -39,8 +40,7 @@ let lyricsFiles = []; // {file, name, normBase, kind}
 let trackLyrics = new Map(); // trackId -> {kind, lines[]}
 let currentIndex = -1;
 
-const audio = document.getElementById("audioEl");
-if (!audio) { alert("audioEl not found"); }
+const audio = new Audio();
 
 // Robust play helper (avoids Android Chrome play()/pause() interruption crash overlays)
 async function safePlay() {
@@ -56,8 +56,7 @@ async function safePlay() {
         await audio.play();
         return true;
       } catch (_) {
-        setStatus("PLAY FAILED");
-    return false;
+        return false;
       }
     }
     // NotAllowedError happens if user hasn't interacted yet
@@ -723,3 +722,4 @@ btnOnlineTranslate.addEventListener("click", () => {
 
 // Initial
 updatePlayButton();
+}catch(e){ try{ const p=document.getElementById('errPanel'); if(p){ p.style.display='block'; p.textContent='APP ERROR\n'+(e&&e.stack?e.stack:String(e)); } }catch(_){} }
