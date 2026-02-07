@@ -75,11 +75,15 @@ label.btn{gap:8px}
 .wordChips .w:active{transform:translateY(1px)}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(17,24,39,.92);
   border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:999px;color:var(--text);font-weight:800;font-size:12px;z-index:9999}
+
+.wlink{cursor:pointer;border-bottom:1px dotted rgba(96,165,250,.55); padding-bottom:1px}
+.wlink:hover{border-bottom-color:rgba(96,165,250,.95)}
+
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket v1.3 (FIX5b → TANGO-CHO)</div>
+  <div class="h1">LyricsPocket v1.3 (FIX6b → TANGO-CHO)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
   <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります。</div>
 
@@ -193,7 +197,7 @@ function extractWords(en){
     seen.add(key);
     if (w.length > 24) continue;
     out.push(w);
-    if (out.length >= 24) break;
+    if (out.length >= 60) break;
   }
   return out;
 }
@@ -215,6 +219,28 @@ function renderWordChips(en){
     wordChipsEl.appendChild(b);
   }
 }
+
+
+function decorateLyricHTML(text, lineIndex){
+  // Wrap each English word in a clickable span.
+  const s = String(text||"");
+  const reW = /[A-Za-z][A-Za-z'\-’]*/g;
+  let out = "";
+  let last = 0;
+  let m;
+  while ((m = reW.exec(s)) !== null){
+    const a = m.index;
+    const b = a + m[0].length;
+    const pre = s.slice(last, a);
+    out += esc(pre);
+    const w = m[0];
+    out += '<span class="wlink" data-w="'+esc(w)+'" data-i="'+String(lineIndex)+'">'+esc(w)+'</span>';
+    last = b;
+  }
+  out += esc(s.slice(last));
+  return out;
+}
+
 
 function pushInbox(word, example){
   try{
@@ -397,7 +423,7 @@ renderWordChips("");
     div.className = "lyLine" + (i===currentLineIndex ? " current":"");
     div.dataset.i = String(i);
     div.innerHTML =
-      '<div class="en">'+esc(ln.en)+'</div>' +
+      '<div class="en">'+decorateLyricHTML(ln.en, i)+'</div>' +
       '<div class="jp">'+(jpOn ? esc(ln.jp||"") : "")+'</div>';
     panelLyrics.appendChild(div);
   }
@@ -630,10 +656,29 @@ lyricListEl.addEventListener("change", (e)=>{
   loadLyricsKey(key);
 });
 
+
 panelLyrics.addEventListener("click", (e)=>{
-  const row = e.target && e.target.closest ? e.target.closest(".lyLine") : null;
+  const t = e.target;
+
+  // Word click → send to TANGO-CHO (do not change current line selection unless needed)
+  if (t && t.classList && t.classList.contains("wlink")){
+    const w = t.dataset ? t.dataset.w : "";
+    const li = t.dataset ? parseInt(t.dataset.i,10) : -1;
+    const ex = (li>=0 && currentLines[li]) ? currentLines[li].en : ((currentLineIndex>=0 && currentLines[currentLineIndex]) ? currentLines[currentLineIndex].en : "");
+    toast("SEND → TANGO-CHO: " + w);
+    sendToTangoCho(w, ex);
+    e.stopPropagation();
+    return;
+  }
+
+  // Line click → select line + translate
+  const row = t && t.closest ? t.closest(".lyLine") : null;
   if (!row) return;
   const i = parseInt(row.dataset.i,10);
+  if (!isFinite(i)) return;
+  highlightLine(i);
+  maybeTranslateLine(i);
+});
   if (!isFinite(i)) return;
   highlightLine(i);
   maybeTranslateLine(i);
@@ -690,7 +735,7 @@ wordChipsEl.addEventListener("click", (e)=>{
 });
 
 // init
-setStatus("JS OK (FIX5b TANGO)");
+setStatus("JS OK (FIX6b TANGO)");
 setCur("","");
 renderWordChips("");
 renderTrackList();
