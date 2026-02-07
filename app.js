@@ -617,9 +617,11 @@ function selectTrack(index) {
   currentIndex = index;
   const t = tracks[index];
   audio.src = t.url;
+  try{ audio.currentTime = 0; }catch(_){ }
+  try{ audio.load(); }catch(_){ }
   audio.currentTime = 0;
   updatePlayButton();
-  setStatus(`${tracks.length} FILES LOADED | ${currentIndex+1}/${tracks.length} | ${t.title}`);
+  setStatus(`${tracks.length} FILES LOADED | ${t.title}`);
 
   let doc = trackLyrics.get(t.id);
   renderLyrics(doc || null);
@@ -631,16 +633,33 @@ function selectTrack(index) {
       // still on the same track?
       if (currentIndex === index) {
         renderLyrics(d);
-        setStatus(`${tracks.length} FILES LOADED | ${currentIndex+1}/${tracks.length} | LYRICS AUTO`);
+        setStatus(`${tracks.length} FILES LOADED | LYRICS AUTO`);
       }
     });
   }
   srcLine.textContent = "";
   jpLine.textContent = "TAP A LINE TO TRANSLATE";
-  // refresh track list UI selection
-  try{ renderTrackList(); }catch(_){ }
-
 }
+
+// ---------- Reliable playback (Android-safe) ----------
+async function playSelectedTrack(){
+  try{
+    // force reload on Android
+    audio.pause();
+    audio.load();
+  }catch(_){}
+  // Wait a tick so src swap is applied
+  await new Promise(r => setTimeout(r, 60));
+  try{
+    await playSelectedTrack();
+  }catch(_){
+    // try once more after user gesture
+    await new Promise(r => setTimeout(r, 180));
+    try{ await audio.play(); }catch(__){}
+  }
+  updatePlayButton();
+}
+
 
 btnPlay.addEventListener("click", async () => {
   if (!tracks.length) return;
@@ -650,30 +669,18 @@ btnPlay.addEventListener("click", async () => {
   updatePlayButton();
 });
 
-btnPrev.addEventListener("click", () => {
+btnPrev.addEventListener("click", async () => {
   if (!tracks.length) return;
-  if (tracks.length < 2) { setStatus("ONLY 1 TRACK LOADED"); audio.currentTime = 0; audio.play().catch(()=>{}); return; }
-  let pi;
-  if (currentIndex < 0) pi = 0;
-  else if (currentIndex <= 0) pi = tracks.length - 1; // wrap
-  else pi = currentIndex - 1;
-
+  const pi = (currentIndex < 0) ? 0 : ((currentIndex - 1 + tracks.length) % tracks.length);
   selectTrack(pi);
-  audio.play().catch(()=>{});
-  updatePlayButton();
+  await playSelectedTrack();
 });
 
-btnNext.addEventListener("click", () => {
+btnNext.addEventListener("click", async () => {
   if (!tracks.length) return;
-  if (tracks.length < 2) { setStatus("ONLY 1 TRACK LOADED"); audio.currentTime = 0; audio.play().catch(()=>{}); return; }
-  let ni;
-  if (currentIndex < 0) ni = 0;
-  else if (currentIndex >= tracks.length - 1) ni = 0; // wrap
-  else ni = currentIndex + 1;
-
+  const ni = (currentIndex < 0) ? 0 : ((currentIndex + 1) % tracks.length);
   selectTrack(ni);
-  audio.play().catch(()=>{});
-  updatePlayButton();
+  await playSelectedTrack();
 });
 
 btnFiles.addEventListener("click", () => inputAudio.click());
@@ -709,11 +716,12 @@ audio.addEventListener("timeupdate", () => {
 
 audio.addEventListener("play", updatePlayButton);
 audio.addEventListener("pause", updatePlayButton);
-audio.addEventListener("ended", () => {
-  // auto-next
-  if (currentIndex >= 0 && currentIndex < tracks.length - 1) {
-    selectTrack(currentIndex + 1);
-    audio.play().catch(()=>{});
+audio.addEventListener("ended", async () => {
+  if (!tracks.length) return;
+  const ni = (currentIndex < 0) ? 0 : ((currentIndex + 1) % tracks.length);
+  selectTrack(ni);
+  await playSelectedTrack();
+});
   } else {
     updatePlayButton();
   }
