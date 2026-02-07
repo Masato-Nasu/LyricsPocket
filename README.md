@@ -39,7 +39,8 @@ python -m http.server 8000
 `samples/` にダミーの歌詞ファイルを同梱しています（著作物は含みません）。
 
 
-## 日本語訳（本版の変更点）
+## 日本語訳（JPfix版）
 
-- `ONLINE JP` は **初期状態でON** です。
-- 翻訳APIが失敗した場合は、`OPEN`（Google翻訳を開く）と `COPY` を表示します。
+- `ONLINE JP` は初期状態で **ON**（タップで日本語が出ます）
+- 失敗時は `OPEN`（Google翻訳）/`COPY` を表示
+- Service Worker のキャッシュ名を更新済み（反映しやすい）

@@ -267,7 +267,6 @@ async function translateToJP(text) {
 
   srcLine.textContent = trimmed;
 
-  // Always try to show JP in-app when ONLINE is ON
   if (!onlineTranslate) {
     // offline mode: copy and tell user to use system translate
     try {
@@ -318,7 +317,7 @@ async function translateToJP(text) {
 
     if (btnOpen) {
       btnOpen.addEventListener("click", () => {
-        window.open(\`https://translate.google.com/?sl=en&tl=ja&text=${q}&op=translate\`, "_blank", "noopener");
+        window.open(`https://translate.google.com/?sl=en&tl=ja&text=${q}&op=translate`, "_blank", "noopener");
       }, { once: true });
     }
     if (btnCopy) {
@@ -336,7 +335,7 @@ async function translateToJP(text) {
   }
 }
 
-function onTapLine(text) {(text) {
+function onTapLine(text) {
   translateToJP(text);
 }
 
