@@ -33,6 +33,67 @@ input.fileBtn{
 input.fileBtn:hover{ background:rgba(255,255,255,.09); }
 input.fileBtn:active{ transform:translateY(1px); }
 </style>
+
+<script>
+/* SW Reset Guard: If a broken Service Worker is still controlling this scope, it can cause a blank screen
+   even after deploying a NoSW build. This script unregisters all SW registrations + clears caches once,
+   then hard-reloads. It runs only once per session (sessionStorage flag).
+*/
+(async function(){
+  try{
+    if (sessionStorage.getItem("lp_sw_reset_done")) return;
+    sessionStorage.setItem("lp_sw_reset_done","1");
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    // Best-effort: clear SW-controlled requests by forcing reload
+    location.replace(location.href.split("#")[0] + "?swreset=1");
+  }catch(e){
+    // If anything fails, keep going (do not block the app)
+  }
+})();
+</script>
+
+
+<style>
+#errPanel{
+  position:fixed; left:12px; right:12px; bottom:12px;
+  max-height:42vh; overflow:auto;
+  background:rgba(0,0,0,.84);
+  border:1px solid rgba(255,255,255,.18);
+  color:rgba(255,255,255,.92);
+  padding:10px 12px;
+  border-radius:12px;
+  font-size:12px;
+  line-height:1.35;
+  z-index:99999;
+  display:none;
+  white-space:pre-wrap;
+}
+#errPanel .t{font-weight:700; margin-bottom:6px;}
+</style>
+<script>
+(function(){
+  const show = (msg) => {
+    const p = document.getElementById("errPanel");
+    if (!p) return;
+    p.style.display = "block";
+    p.innerHTML = '<div class="t">APP ERROR</div>' + String(msg).replace(/[&<>]/g, s=>({ "&":"&amp;","<":"&lt;",">":"&gt;"}[s]));
+  };
+  window.addEventListener("error", (e) => {
+    show((e && e.message) ? e.message : (e && e.error) ? String(e.error) : "Unknown error");
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    show("Unhandled Promise Rejection:\n" + (e.reason ? String(e.reason) : "Unknown"));
+  });
+})();
+</script>
+
 </head>
 
 
@@ -85,5 +146,6 @@ input.fileBtn:active{ transform:translateY(1px); }
   <script src="./app.js" type="module"></script>
 
   <audio id="audioEl" preload="metadata" playsinline></audio>
+<div id="errPanel"></div>
 </body>
 </html>

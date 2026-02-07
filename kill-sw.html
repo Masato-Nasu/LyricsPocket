@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>LyricsPocket SW Reset</title>
+<style>
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial; margin:20px; line-height:1.6;}
+.box{padding:14px 16px; border:1px solid #ddd; border-radius:12px;}
+pre{white-space:pre-wrap;}
+</style>
+</head>
+<body>
+<h2>Service Worker Reset</h2>
+<div class="box">
+<p>古いService WorkerとCacheを削除します。完了後、自動でトップへ移動します。</p>
+<pre id="log">Running...</pre>
+</div>
+<script>
+(async function(){
+  const log = (t)=>{ document.getElementById("log").textContent += "\n" + t; };
+  try{
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      log("registrations: " + regs.length);
+      await Promise.all(regs.map(r => r.unregister()));
+      log("unregistered");
+    } else {
+      log("serviceWorker not supported");
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      log("caches: " + keys.join(", "));
+      await Promise.all(keys.map(k => caches.delete(k)));
+      log("caches deleted");
+    }
+    log("done -> redirect");
+    setTimeout(()=>location.href="./index.html?swreset=1", 500);
+  }catch(e){
+    log("ERROR: " + (e && e.stack ? e.stack : String(e)));
+  }
+})();
+</script>
+</body>
+</html>
