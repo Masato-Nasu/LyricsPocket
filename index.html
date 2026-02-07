@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- OneFileReset v2: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- OneFileReset v3: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -118,7 +118,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">OneFileReset v2</span>
+      <span class="chip" style="opacity:.7">OneFileReset v3</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -145,6 +145,17 @@ a{color:rgba(160,220,255,.95)}
           <option value="">TRACK: (未選択)</option>
         </select>
       </div>
+      <div class="row" style="margin-top:10px">
+        <select id="selLyric">
+          <option value="">LYRICS: (未選択)</option>
+        </select>
+        <button id="btnLink" class="btn secondary" type="button">LINK</button>
+        <button id="btnUnlink" class="btn secondary" type="button">UNLINK</button>
+      </div>
+      <div class="small" style="margin-top:8px">
+        曲と歌詞が一致しない場合：TRACKを選んでから、LYRICSを選び、LINKしてください（端末内に保存されます）。
+      </div>
+
     </div>
   </div>
 
@@ -202,6 +213,9 @@ a{color:rgba(160,220,255,.95)}
   const inLyrics = $("inLyrics");
 
   const selTrack = $("selTrack");
+  const selLyric = $("selLyric");
+  const btnLink = $("btnLink");
+  const btnUnlink = $("btnUnlink");
   const audio = $("audio");
   const listEl = $("list");
   const curEn = $("curEn");
@@ -217,6 +231,9 @@ a{color:rgba(160,220,255,.95)}
   let currentLineIndex = -1;
 
   const lyricsByBase = new Map(); // baseName -> text
+  const lyricsFiles = []; // {base, name, text}
+  const LINK_KEY = "lp_link_map_v3";
+  let linkMap = loadLinkMap();
 
   function setStatus(t){ status.textContent = t; }
 
@@ -229,6 +246,21 @@ a{color:rgba(160,220,255,.95)}
     if (!n) return "";
     const dot = n.lastIndexOf(".");
     return (dot>=0 ? n.slice(0,dot) : n).toLowerCase();
+  }
+
+  function loadLinkMap(){
+    try{
+      const raw = localStorage.getItem(LINK_KEY);
+      if (!raw) return new Map();
+      const obj = JSON.parse(raw);
+      return new Map(Object.entries(obj || {}));
+    }catch(_){ return new Map(); }
+  }
+  function saveLinkMap(){
+    try{
+      const obj = Object.fromEntries(linkMap.entries());
+      localStorage.setItem(LINK_KEY, JSON.stringify(obj));
+    }catch(_){}
   }
 
   function normalizeKey(name){
@@ -244,7 +276,8 @@ a{color:rgba(160,220,255,.95)}
   }
 
   function parseLyrics(text){
-    const raw = (text || "").replace(//g,"");
+    const raw = (text || "").replace(/
+/g,"");
     const lines = raw.split("
 ");
     const out = [];
@@ -311,17 +344,28 @@ a{color:rgba(160,220,255,.95)}
       lyricLines = [];
       renderList();
       setStatus("LYRICS: NONE (load .lrc or .txt)");
+      rebuildLyricSelect("");
       return false;
     }
 
-    const base = baseName(name);
-    let txt = lyricsByBase.get(base);
+    const trackNK = normalizeKey(name);
+    const linkedBase = linkMap.get(trackNK) || "";
+    let txt = linkedBase ? lyricsByBase.get(linkedBase) : null;
 
+    // Auto match if no manual link or missing
+    if (!txt){
+      const base = baseName(name);
+      txt = lyricsByBase.get(base) || null;
+    }
+
+    // If only one lyrics file, use it
     if (!txt && lyricsByBase.size === 1){
       txt = Array.from(lyricsByBase.values())[0];
       setStatus("LYRICS: using the only file");
     }
 
+    // Fuzzy match by normalized key
+    let usedBase = "";
     if (!txt){
       const nk = normalizeKey(name);
       let bestKey = null;
@@ -340,21 +384,42 @@ a{color:rgba(160,220,255,.95)}
           }
         }
       }
-      if (bestKey) txt = lyricsByBase.get(bestKey);
+      if (bestKey){
+        txt = lyricsByBase.get(bestKey);
+        usedBase = bestKey;
+      }
+    } else {
+      // determine which base was used when linked
+      usedBase = linkedBase || "";
+      if (!usedBase){
+        const base = baseName(name);
+        if (lyricsByBase.has(base)) usedBase = base;
+      }
     }
+
+    // If linked base exists but file missing, clear selection
+    rebuildLyricSelect(usedBase);
 
     if (!txt){
       lyricLines = [];
       renderList();
-      setStatus("LYRICS: NO MATCH (rename lyrics file to match track name)");
+      setStatus("LYRICS: NO MATCH (use TRACK+LYRICS then LINK)");
       return false;
+    }
+
+    // Determine used base if not set
+    if (!usedBase){
+      // find key by value (rare)
+      for (const [k,v] of lyricsByBase.entries()){
+        if (v === txt){ usedBase = k; break; }
+      }
+      rebuildLyricSelect(usedBase);
     }
 
     lyricLines = parseLyrics(txt);
     currentLineIndex = -1;
     renderList();
     setStatus(`LYRICS LOADED: ${lyricLines.length} lines`);
-    // If plain-text lyrics, show first line
     if (lyricLines.length && lyricLines[0].t == null){
       highlight(0);
       if (onlineJP) translateLine(0);
@@ -371,13 +436,30 @@ a{color:rgba(160,220,255,.95)}
       const reader = new FileReader();
       reader.onload = () => {
         const txt = String(reader.result || "");
-        lyricsByBase.set(baseName(f.name), txt);
+                const b = baseName(f.name);
+        lyricsByBase.set(b, txt);
+        rebuildLyricSelect(b);
         setStatus(`LYRICS READY: ${lyricsByBase.size} files`);
         if (trackIndex>=0) pickLyricsForTrack(tracks[trackIndex].name);
       };
       reader.readAsText(f);
     }
     if (!n) setStatus("NO LYRICS FOUND");
+  }
+
+  function rebuildLyricSelect(selectedBase=""){
+    selLyric.innerHTML = '<option value="">LYRICS: (未選択)</option>';
+    // populate from lyricsByBase keys, but keep original filename order if available
+    const keys = Array.from(lyricsByBase.keys()).sort();
+    for (const k of keys){
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = k;
+      selLyric.appendChild(opt);
+    }
+    if (selectedBase && lyricsByBase.has(selectedBase)){
+      selLyric.value = selectedBase;
+    }
   }
 
   function rebuildTrackSelect(){
@@ -564,6 +646,47 @@ a{color:rgba(160,220,255,.95)}
     selectTrack(Number(v), false);
   });
 
+  selLyric.addEventListener("change", () => {
+    // just selecting doesn't link yet; LINK button writes mapping
+    const v = selLyric.value || "";
+    if (v && trackIndex>=0){
+      // preview load without saving mapping
+      const txt = lyricsByBase.get(v);
+      if (txt){
+        lyricLines = parseLyrics(txt);
+        currentLineIndex = -1;
+        renderList();
+        setStatus(`LYRICS PREVIEW: ${lyricLines.length} lines`);
+        if (lyricLines.length && lyricLines[0].t == null){
+          highlight(0);
+          if (onlineJP) translateLine(0);
+        }
+      }
+    }
+  });
+
+  btnLink.addEventListener("click", () => {
+    if (trackIndex < 0 || !tracks.length){ alert("TRACKを選んでください"); return; }
+    const b = selLyric.value || "";
+    if (!b || !lyricsByBase.has(b)){ alert("LYRICSを選んでください"); return; }
+    const tnk = normalizeKey(tracks[trackIndex].name);
+    linkMap.set(tnk, b);
+    saveLinkMap();
+    setStatus("LINKED ✅");
+    // apply immediately
+    pickLyricsForTrack(tracks[trackIndex].name);
+  });
+
+  btnUnlink.addEventListener("click", () => {
+    if (trackIndex < 0 || !tracks.length) return;
+    const tnk = normalizeKey(tracks[trackIndex].name);
+    linkMap.delete(tnk);
+    saveLinkMap();
+    setStatus("UNLINKED");
+    pickLyricsForTrack(tracks[trackIndex].name);
+  });
+
+
   btnPlay.addEventListener("click", async () => {
     if (!tracks.length){ alert("まずFILESで音声ファイルを選択してください。"); return; }
     if (audio.paused) await safePlay();
@@ -594,7 +717,7 @@ a{color:rgba(160,220,255,.95)}
 
   // Initial UI
   listEl.style.display = "block";
-  setStatus("READY (OneFileReset v2)");
+  setStatus("READY (OneFileReset v3)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>

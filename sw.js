@@ -1,1 +1,1 @@
-/* OneFileReset v2: Service Worker intentionally not used. */
+/* OneFileReset v3: Service Worker intentionally not used. */
