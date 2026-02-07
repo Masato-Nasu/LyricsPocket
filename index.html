@@ -68,11 +68,18 @@ body{
 hr{border:none; border-top:1px solid var(--line); margin:10px 0}
 audio{width:100%}
 label.btn{gap:8px}
+
+.wordChips{display:flex;flex-wrap:wrap;gap:8px}
+.wordChips .w{display:inline-flex;align-items:center;justify-content:center;padding:8px 10px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--text);font-weight:800;font-size:12px;cursor:pointer;user-select:none}
+.wordChips .w:active{transform:translateY(1px)}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(17,24,39,.92);
+  border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:999px;color:var(--text);font-weight:800;font-size:12px;z-index:9999}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket v1.3 (ONEFILE FIX3)</div>
+  <div class="h1">LyricsPocket v1.3 (FIX4 → TANGO-CHO)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
   <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります。</div>
 
@@ -129,6 +136,7 @@ const inLyrics = $("inLyrics");
 const audioEl = $("audio");
 const statusEl = $("status");
 const curLineEl = $("curLine");
+const wordChipsEl = $("wordChips");
 const chipTrack = $("chipTrack");
 const trackListEl = $("trackList");
 const lyricListEl = $("lyricList");
@@ -155,6 +163,83 @@ let syncTimer = null;
 
 function setStatus(t){ statusEl.textContent = String(t); }
 function setCur(en, jp){ curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + (jp||""); }
+
+const TANGO_CHO_URL = "https://masato-nasu.github.io/TANGO-CHO/"; // 連動先（必要なら変更）
+
+function toast(msg){
+  try{
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = String(msg);
+    document.body.appendChild(t);
+    setTimeout(()=>{ try{ t.remove(); }catch(e){} }, 1200);
+  }catch(e){}
+}
+
+function extractWords(en){
+  const s = String(en||"");
+  const m = s.match(/[A-Za-z][A-Za-z'\-’]*/g);
+  if (!m) return [];
+  const out = [];
+  const seen = new Set();
+  for (const w0 of m){
+    const w = w0.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g,"");
+    if (!w) continue;
+    const key = w.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (w.length > 24) continue;
+    out.push(w);
+    if (out.length >= 24) break;
+  }
+  return out;
+}
+
+function renderWordChips(en){
+  if (!wordChipsEl) return;
+  wordChipsEl.innerHTML = "";
+  const words = extractWords(en);
+  if (!words.length){
+    wordChipsEl.innerHTML = '<div class="small" style="opacity:.75">（英単語が見つかりません）</div>';
+    return;
+  }
+  for (const w of words){
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "w";
+    b.textContent = w;
+    b.dataset.w = w;
+    wordChipsEl.appendChild(b);
+  }
+}
+
+function pushInbox(word, example){
+  try{
+    const key = "TANGO_CHO_INBOX";
+    const raw = localStorage.getItem(key);
+    const arr = raw ? JSON.parse(raw) : [];
+    arr.unshift({word, example, src:"LyricsPocket", ts:Date.now()});
+    localStorage.setItem(key, JSON.stringify(arr.slice(0,200)));
+  }catch(e){}
+}
+
+function sendToTangoCho(word, example){
+  try{
+    const w = String(word||"").trim();
+    if (!w) return;
+    const ex = String(example||"").trim();
+    pushInbox(w, ex);
+
+    const u = new URL(TANGO_CHO_URL);
+    u.searchParams.set("word", w);
+    if (ex) u.searchParams.set("ex", ex);
+    u.searchParams.set("src", "lyricspocket");
+    location.href = u.toString();
+  }catch(e){
+    toast("SEND FAILED");
+  }
+}
+
 
 function normalizeKey(name){
   let s = String(name||"").toLowerCase();
@@ -260,6 +345,7 @@ function renderLyrics(){
   if (!currentLines.length){
     panelLyrics.innerHTML = '<div class="lyLine"><div class="en" style="opacity:.75">歌詞がありません。LYRICSを選ぶ で .lrc/.txt を読み込むか、下のLYRICSから選択してください。</div></div>';
     setCur("","");
+renderWordChips("");
     return;
   }
   for (let i=0;i<currentLines.length;i++){
@@ -284,6 +370,7 @@ function highlightLine(i){
   });
   const ln = currentLines[i];
   setCur(ln.en, jpOn ? (ln.jp||"") : "");
+  renderWordChips(ln.en);
   const cur = panelLyrics.querySelector(".lyLine.current");
   if (cur && cur.scrollIntoView) cur.scrollIntoView({block:"center", behavior:"smooth"});
 }
@@ -548,9 +635,21 @@ audioEl.addEventListener("play", startSync);
 audioEl.addEventListener("pause", stopSync);
 audioEl.addEventListener("ended", stopSync);
 
+
+wordChipsEl.addEventListener("click", (e)=>{
+  const t = e.target;
+  if (!t) return;
+  const w = t.dataset ? t.dataset.w : "";
+  if (!w) return;
+  const ex = (currentLineIndex>=0 && currentLines[currentLineIndex]) ? currentLines[currentLineIndex].en : "";
+  toast("SEND → TANGO-CHO: " + w);
+  sendToTangoCho(w, ex);
+});
+
 // init
-setStatus("JS OK (ONEFILE FIX3)");
+setStatus("JS OK (FIX4 TANGO)");
 setCur("","");
+renderWordChips("");
 renderTrackList();
 renderLyricList();
 
