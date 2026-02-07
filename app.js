@@ -637,7 +637,10 @@ function selectTrack(index) {
   }
   srcLine.textContent = "";
   jpLine.textContent = "TAP A LINE TO TRANSLATE";
+  // refresh track list UI selection
+  try{ renderTrackList(); }catch(_){ }
 }
+
 
 btnPlay.addEventListener("click", async () => {
   if (!tracks.length) return;
@@ -649,17 +652,21 @@ btnPlay.addEventListener("click", async () => {
 
 btnPrev.addEventListener("click", () => {
   if (!tracks.length) return;
-  const ni = Math.max(0, currentIndex - 1);
-  selectTrack(ni);
+  const pi = (currentIndex < 0) ? 0 : Math.max(0, currentIndex - 1);
+  selectTrack(pi);
   audio.play().catch(()=>{});
+  updatePlayButton();
+});
   updatePlayButton();
 });
 
 btnNext.addEventListener("click", () => {
   if (!tracks.length) return;
-  const ni = Math.min(tracks.length - 1, currentIndex + 1);
+  const ni = (currentIndex < 0) ? 0 : Math.min(tracks.length - 1, currentIndex + 1);
   selectTrack(ni);
   audio.play().catch(()=>{});
+  updatePlayButton();
+});
   updatePlayButton();
 });
 
