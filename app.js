@@ -15,10 +15,10 @@ function escapeHTML(s){
   try{
     if (!("serviceWorker" in navigator)) return;
     if (!navigator.serviceWorker.controller) return;
-    if (localStorage.getItem("lp_sw_cleanup_done") === "1") return;
+    if (localStorage.getItem("lp_sw_cleanup_done_fix2") === "1") return;
 
     // mark now to avoid loops even if something fails
-    localStorage.setItem("lp_sw_cleanup_done","1");
+    localStorage.setItem("lp_sw_cleanup_done_fix2","1");
 
     Promise.resolve()
       .then(()=>navigator.serviceWorker.getRegistrations())
