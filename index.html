@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- TrackRadio v1 DIAG: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- TrackRadio v1.1 DIAG: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -142,7 +142,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">TrackRadio v1 DIAG</span>
+      <span class="chip" style="opacity:.7">TrackRadio v1.1 DIAG</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -330,10 +330,8 @@ const trackList = $("trackList");
   }
 
   function parseLyrics(text){
-    const raw = (text || "").replace(/
-/g,"");
-    const lines = raw.split("
-");
+    const raw = (text || "").replace(/\r/g,"");
+    const lines = raw.split("\n");
     const out = [];
     const timeRe = /\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g;
     const hasTime = /\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]/.test(raw);
@@ -830,10 +828,10 @@ selLyric.addEventListener("change", () => {
   listEl.style.display = "block";
 
   // JS OK marker
-  setStatus("JS OK (TrackRadio v1 DIAG)");
+  setStatus("JS OK (TrackRadio v1.1 DIAG)");
   try{ const c = (navigator.serviceWorker && navigator.serviceWorker.controller) ? "YES" : "NO"; setStatus("SW controller: " + c);
   try{ setStatus(`TRACKS: ${tracks.length} / LYRICS: ${lyricsByBase.size}`); }catch(_){ } }catch(_){ }
-  setStatus("READY (TrackRadio v1 DIAG)");
+  setStatus("READY (TrackRadio v1.1 DIAG)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>
