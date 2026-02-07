@@ -39,81 +39,6 @@ let trackLyrics = new Map(); // trackId -> {kind, lines[]}
 let currentIndex = -1;
 
 const audio = new Audio();
-
-
-// ---------- Media Session (Android lockscreen / headset) ----------
-let mediaSessionReady = false;
-
-function goNext(play=true){
-  if (!tracks.length) return;
-  const ni = Math.min(tracks.length - 1, currentIndex + 1);
-  selectTrack(ni);
-  if (play) audio.play().catch(()=>{});
-  updatePlayButton();
-}
-function goPrev(play=true){
-  if (!tracks.length) return;
-  const pi = Math.max(0, currentIndex - 1);
-  selectTrack(pi);
-  if (play) audio.play().catch(()=>{});
-  updatePlayButton();
-}
-
-function ensureMediaSession(){
-  if (mediaSessionReady) return;
-  if (!("mediaSession" in navigator)) return;
-
-  mediaSessionReady = true;
-
-  try{
-    navigator.mediaSession.setActionHandler("play", async () => {
-      try{ await audio.play(); }catch(_){}
-      updatePlayButton();
-    });
-    navigator.mediaSession.setActionHandler("pause", () => {
-      audio.pause();
-      updatePlayButton();
-    });
-    navigator.mediaSession.setActionHandler("stop", () => {
-      audio.pause();
-      audio.currentTime = 0;
-      updatePlayButton();
-    });
-    navigator.mediaSession.setActionHandler("previoustrack", () => goPrev(true));
-    navigator.mediaSession.setActionHandler("nexttrack", () => goNext(true));
-    navigator.mediaSession.setActionHandler("seekto", (details) => {
-      if (details && typeof details.seekTime === "number") {
-        audio.currentTime = details.seekTime;
-      }
-    });
-  }catch(_){}
-}
-
-function updateMediaSessionMeta(track){
-  if (!track) return;
-  if (!("mediaSession" in navigator)) return;
-  ensureMediaSession();
-
-  try{
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.name || "Track",
-      artist: "",
-      album: "LyricsPocket",
-    });
-  }catch(_){}
-}
-
-function updateMediaSessionPosition(){
-  if (!("mediaSession" in navigator)) return;
-  if (!navigator.mediaSession || !navigator.mediaSession.setPositionState) return;
-  try{
-    navigator.mediaSession.setPositionState({
-      duration: isFinite(audio.duration) ? audio.duration : 0,
-      playbackRate: audio.playbackRate || 1,
-      position: isFinite(audio.currentTime) ? audio.currentTime : 0
-    });
-  }catch(_){}
-}
 audio.preload = "metadata";
 audio.playsInline = true;
 
@@ -719,6 +644,7 @@ function selectTrack(index) {
 }
 
 btnPlay.addEventListener("click", async () => {
+  ensureMediaSession();
   if (!tracks.length) return;
   if (currentIndex === -1) selectTrack(0);
   if (audio.paused) await audio.play();
@@ -727,15 +653,15 @@ btnPlay.addEventListener("click", async () => {
 });
 
 btnPrev.addEventListener("click", () => {
-  if (!tracks.length) return;
-  const ni = Math.max(0, currentIndex - 1);
-  selectTrack(ni);
-  audio.play().catch(()=>{});
+  goPrev(true);
+});
   updatePlayButton();
 });
 
 btnNext.addEventListener("click", () => {
   goNext(true);
+});
+  updatePlayButton();
 });
 
 btnFiles.addEventListener("click", () => inputAudio.click());
@@ -767,6 +693,7 @@ audio.addEventListener("timeupdate", () => {
   const t = tracks[currentIndex];
   const doc = trackLyrics.get(t.id);
   highlightCurrent(doc, audio.currentTime);
+  updateMediaSessionPosition();
 });
 
 audio.addEventListener("play", updatePlayButton);
@@ -816,6 +743,77 @@ btnOnlineTranslate.addEventListener("click", () => {
     jpLine.textContent = "TAP A LINE TO TRANSLATE";
   }
 });
+
+
+// ---------- Media Session (Android lockscreen / headset) ----------
+let mediaSessionReady = false;
+
+function goNext(play=true){
+  if (!tracks.length) return;
+  const ni = Math.min(tracks.length - 1, currentIndex + 1);
+  selectTrack(ni);
+  if (play) audio.play().catch(()=>{});
+  updatePlayButton();
+}
+function goPrev(play=true){
+  if (!tracks.length) return;
+  const pi = Math.max(0, currentIndex - 1);
+  selectTrack(pi);
+  if (play) audio.play().catch(()=>{});
+  updatePlayButton();
+}
+
+function ensureMediaSession(){
+  if (mediaSessionReady) return;
+  if (!("mediaSession" in navigator)) return;
+  mediaSessionReady = true;
+
+  try{
+    navigator.mediaSession.setActionHandler("play", async () => {
+      try{ await audio.play(); }catch(_){}
+      updatePlayButton();
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      audio.pause();
+      updatePlayButton();
+    });
+    navigator.mediaSession.setActionHandler("stop", () => {
+      audio.pause();
+      audio.currentTime = 0;
+      updatePlayButton();
+    });
+    navigator.mediaSession.setActionHandler("previoustrack", () => goPrev(true));
+    navigator.mediaSession.setActionHandler("nexttrack", () => goNext(true));
+    navigator.mediaSession.setActionHandler("seekto", (details) => {
+      if (details && typeof details.seekTime === "number") audio.currentTime = details.seekTime;
+    });
+  }catch(_){}
+}
+
+function updateMediaSessionMeta(track){
+  if (!track) return;
+  if (!("mediaSession" in navigator)) return;
+  ensureMediaSession();
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.name || "Track",
+      artist: "",
+      album: "LyricsPocket",
+    });
+  }catch(_){}
+}
+
+function updateMediaSessionPosition(){
+  if (!("mediaSession" in navigator)) return;
+  if (!navigator.mediaSession || !navigator.mediaSession.setPositionState) return;
+  try{
+    navigator.mediaSession.setPositionState({
+      duration: isFinite(audio.duration) ? audio.duration : 0,
+      playbackRate: audio.playbackRate || 1,
+      position: isFinite(audio.currentTime) ? audio.currentTime : 0
+    });
+  }catch(_){}
+}
 
 // ---------- Service Worker ----------
 if ("serviceWorker" in navigator) {
