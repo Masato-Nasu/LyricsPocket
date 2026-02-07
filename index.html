@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=fix6j">
+<link rel="manifest" href="./manifest.webmanifest?v=fix6k">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -135,17 +135,6 @@ JP:</div>
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
-
-function openGoogleTranslate(text){
-  const t = String(text||"").trim();
-  if (!t) return;
-  const u = "https://translate.google.com/?sl=en&tl=ja&text=" + encodeURIComponent(t) + "&op=translate";
-  try{
-    window.open(u, "_blank");
-  }catch(e){
-    location.href = u;
-  }
-}
 
 function decorateLyricHTML(text, lineIndex){
   // Wrap each English-ish word in a clickable span to send to TANGO-CHO.
@@ -571,61 +560,79 @@ function loadLyricsKey(key){
 }
 
 // Translation endpoint
-// Default: direct MyMemory (may fail due to CORS / quota on some networks)
-// If you deploy a small CORS proxy (Cloudflare Worker), set it here:
+// Uses MyMemory via Cloudflare Worker proxy (recommended to avoid CORS).
 const MYMEMORY_BASE = "https://api.mymemory.translated.net/get";
-const TRANSLATE_PROXY_BASE = "https://lyricspocket-translate.1bitexist.workers.dev/get"; // e.g. "https://lyricspocket-translate.1bitexist.workers.dev/get"
+const TRANSLATE_PROXY_BASE = "https://lyricspocket-translate.1bitexist.workers.dev/get"; // set "" to disable proxy
 
 function buildTranslateURL(q){
   const base = (TRANSLATE_PROXY_BASE && TRANSLATE_PROXY_BASE.trim()) ? TRANSLATE_PROXY_BASE.trim() : MYMEMORY_BASE;
   return base + "?q=" + encodeURIComponent(q) + "&langpair=en|ja";
 }
 
+function openGoogleTranslate(text){
+  const t = String(text||"").trim();
+  if (!t) return;
+  const u = "https://translate.google.com/?sl=en&tl=ja&text=" + encodeURIComponent(t) + "&op=translate";
+  try{ window.open(u, "_blank"); }catch(e){ location.href = u; }
+}
+
 function maybeTranslateLine(i){
   if (!jpOn) return;
   if (!(i>=0 && i<currentLines.length)) return;
   const ln = currentLines[i];
-  if (!ln.en || ln.jp) return;
+
+  // If we already have a real translation, skip.
+  // If ln._jpFallback is set, allow retry (quota may reset later).
+  if (!ln || !ln.en || (ln.jp && !ln._jpFallback)) return;
 
   const q = ln.en.trim();
   if (!q) return;
 
   setStatus("TRANSLATING...");
   const url = buildTranslateURL(q);
-  fetch(url)
-  .then(r=>r.json().catch(()=>({})))
-  .then((data)=>{
-    const status = (data && typeof data.responseStatus === "number") ? data.responseStatus : 200;
-    const tt = data && data.responseData ? data.responseData.translatedText : "";
-    const details = (data && data.responseDetails) ? String(data.responseDetails) : "";
 
-    if (status === 429 || /USED ALL AVAILABLE FREE TRANSLATIONS/i.test(details) || /quota/i.test(details)){
-      ln.jp = "（翻訳制限中：タップでGoogle翻訳）";
+  fetch(url)
+    .then(async (r)=>{
+      const data = await r.json().catch(()=>({}));
+      data._httpStatus = r.status;
+      return data;
+    })
+    .then((data)=>{
+      const status = (typeof data.responseStatus === "number") ? data.responseStatus : (data._httpStatus || 200);
+      const details = data && data.responseDetails ? String(data.responseDetails) : "";
+      const tt = data && data.responseData ? String(data.responseData.translatedText||"") : "";
+
+      // quota / rate limit
+      if (status === 429 || /USED ALL AVAILABLE FREE TRANSLATIONS/i.test(details) || /quota/i.test(details)){
+        ln.jp = "（翻訳制限中：タップでGoogle翻訳）";
+        ln._jpFallback = "google";
+        renderLyrics();
+        setCur(ln.en, ln.jp);
+        setStatus("TRANSLATE LIMITED (429)");
+        return;
+      }
+
+      const txt = tt.trim();
+      if (txt){
+        ln.jp = txt;
+        ln._jpFallback = "";
+        const el = panelLyrics.querySelector('.lyLine[data-i="'+i+'"] .jp');
+        if (el && jpOn) el.textContent = ln.jp;
+        setCur(ln.en, ln.jp);
+        setStatus("OK");
+        return;
+      }
+
+      ln.jp = "（翻訳失敗：タップでGoogle翻訳）";
       ln._jpFallback = "google";
       renderLyrics();
-      setStatus("TRANSLATE LIMITED (429)");
-      return;
-    }
-
-    if (tt){
-      ln.jp = tt;
-      ln._jpFallback = "";
+      setCur(ln.en, ln.jp);
+      setStatus("TRANSLATE FAILED");
+    })
+    .catch(()=>{
+      ln.jp = "（翻訳失敗：タップでGoogle翻訳）";
+      ln._jpFallback = "google";
       renderLyrics();
-      return;
-    }
-
-    ln.jp = "（翻訳失敗：タップでGoogle翻訳）";
-    ln._jpFallback = "google";
-    renderLyrics();
-    setStatus("TRANSLATE FAILED");
-  })
-  .catch(()=>{
-    ln.jp = "（翻訳失敗：タップでGoogle翻訳）";
-    ln._jpFallback = "google";
-    renderLyrics();
-    setStatus("TRANSLATE FAILED");
-  });
-if (el && jpOn) el.textContent = ln.jp;
       setCur(ln.en, ln.jp);
       setStatus("TRANSLATE FAILED");
     });
@@ -722,8 +729,7 @@ panelLyrics.addEventListener("click", (e)=>{
       }
     }
   }
-
-// WORD click → send to TANGO-CHO
+  // WORD click → send to TANGO-CHO
   if (t && t.classList && t.classList.contains("wlink")){
     const w = t.dataset ? t.dataset.w : "";
     const li = t.dataset ? parseInt(t.dataset.i,10) : -1;
