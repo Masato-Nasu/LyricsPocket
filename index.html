@@ -33,46 +33,6 @@ input.fileBtn{
 input.fileBtn:hover{ background:rgba(255,255,255,.09); }
 input.fileBtn:active{ transform:translateY(1px); }
 </style>
-
-<style>
-#errPanel{
-  position:fixed; left:12px; right:12px; bottom:12px;
-  max-height:40vh; overflow:auto;
-  background:rgba(0,0,0,.82);
-  border:1px solid rgba(255,255,255,.18);
-  color:rgba(255,255,255,.92);
-  padding:10px 12px;
-  border-radius:12px;
-  font-size:12px;
-  line-height:1.35;
-  z-index:99999;
-  display:none;
-  white-space:pre-wrap;
-}
-#errPanel .t{font-weight:700; margin-bottom:6px;}
-#errPanel .h{opacity:.7; margin-top:8px;}
-</style>
-<script>
-(function(){
-  const show = (msg) => {
-    let p = document.getElementById("errPanel");
-    if (!p) {
-      p = document.createElement("div");
-      p.id = "errPanel";
-      document.body.appendChild(p);
-    }
-    p.style.display = "block";
-    p.innerHTML = '<div class="t">APP ERROR</div>' + String(msg).replace(/[&<>]/g, s=>({ "&":"&amp;","<":"&lt;",">":"&gt;"}[s]));
-  };
-  window.addEventListener("error", (e) => {
-    show((e && (e.message || e.error)) ? (e.message || String(e.error)) : "Unknown error");
-  });
-  window.addEventListener("unhandledrejection", (e) => {
-    show("Unhandled Promise Rejection:\n" + (e.reason ? String(e.reason) : "Unknown"));
-  });
-})();
-</script>
-
 </head>
 
 

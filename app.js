@@ -1,5 +1,3 @@
-function __showErr(msg){ try{ const p=document.getElementById('errPanel'); if(p){ p.style.display='block'; p.textContent='APP ERROR\n'+msg; } }catch(_){} }
-try{
 // LyricsPocket PWA (Minimal)
 // - Audio files: import via FILES (multiple). FOLDER uses showDirectoryPicker when supported.
 // - Lyrics files: import via LYRICS (txt/lrc). Auto-link by normalized base name.
@@ -46,25 +44,21 @@ const audio = new Audio();
 // Robust play helper (avoids Android Chrome play()/pause() interruption crash overlays)
 async function safePlay() {
   try {
-    const p = safePlay();
-    if (p && typeof p.then === "function") await p;
+    await audio.play();
     return true;
   } catch (e) {
     const msg = String(e?.message || e || "");
-    // Common non-fatal cases: play interrupted by pause(), AbortError, NotAllowedError (no gesture)
+    // Common non-fatal race: play() interrupted by pause() / AbortError
     if (/interrupted by a call to pause\(\)/i.test(msg) || /AbortError/i.test(msg)) {
-      // Retry shortly if still paused (NEXT/PREV often triggers this race)
       await sleep(120);
       try {
-        const p2 = safePlay();
-        if (p2 && typeof p2.then === "function") await p2;
+        await audio.play();
         return true;
       } catch (_) {
         return false;
       }
     }
-    // Don't hard-crash UI on play rejection
-    setStatus(`PLAY FAILED`);
+    // NotAllowedError happens if user hasn't interacted yet
     return false;
   }
 }
@@ -725,11 +719,5 @@ btnOnlineTranslate.addEventListener("click", () => {
   }
 });
 
-// ---------- Service Worker ----------
-);
-  });
-}
-
 // Initial
 updatePlayButton();
-}catch(e){ __showErr(e && e.stack ? e.stack : String(e)); }
