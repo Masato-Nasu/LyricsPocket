@@ -141,11 +141,7 @@ function showList(open) {
 
 function updatePlayButton() {
   btnPlay.textContent = audio.paused ? "PLAY" : "PAUSE";
-  if ("mediaSession" in navigator) {
-    try{ navigator.mediaSession.playbackState = audio.paused ? "paused" : "playing"; }catch(_){ }
-  }
 }
-
 
 // ---------- Lyrics parsing ----------
 function parseTXT(text) {
@@ -613,23 +609,31 @@ async function importFromFolder() {
 
       importAudioFiles(audioCollected);
       await importLyricsFiles(lyricCollected);
+
       setStatus(`${tracks.length} FILES LOADED | ${lyricsFiles.length} LYRICS`);
+      // Auto-select lyrics for current track if any
+      if (currentIndex >= 0) {
+        const t = tracks[currentIndex];
+        const doc = trackLyrics.get(t.id);
+        if (!doc) ensureLyricsForTrack(t).then(d=>{ if(d && currentIndex>=0 && tracks[currentIndex].id===t.id) renderLyrics(d); });
+      }
       return;
     } catch (e) {
-      // user cancelled or not permitted -> fall through to input fallback
+      // user cancelled or not permitted -> fall through
     }
   }
 
-  // Fallback: <input webkitdirectory>
-  if (!folderInput) {
-    alert("この環境ではフォルダ選択が利用できません。FILES / LYRICS を使ってください。");
-    setStatus("FOLDER NOT SUPPORTED");
+  // Fallback: <input webkitdirectory> (Android Chrome often supports)
+  if (folderInput) {
+    folderInput.value = "";
+    folderInput.click();
     return;
   }
 
-  folderInput.value = "";
-  folderInput.click();
+  alert("この環境ではフォルダ選択が利用できません。FILES / LYRICS を使ってください。");
+  setStatus("FOLDER NOT SUPPORTED");
 }
+
 
 // ---------- Playback ----------
 function selectTrack(index) {
@@ -671,21 +675,27 @@ btnPlay.addEventListener("click", async () => {
 btnPrev.addEventListener("click", () => {
   goPrev(true);
 });
+  selectTrack(ni);
+  audio.play().catch(()=>{});
   updatePlayButton();
 });
 
 btnNext.addEventListener("click", () => {
   goNext(true);
 });
+  selectTrack(ni);
+  audio.play().catch(()=>{});
   updatePlayButton();
 });
 
 btnFiles.addEventListener("click", () => inputAudio.click());
 btnLyrics.addEventListener("click", () => inputLyrics.click());
-btnFolder.addEventListener("click", () => importFromFolder());
+btnFolder.addEventListener("click", () => {
+  importFromFolder();
+});
 
 if (folderInput) {
-  folderInput.addEventListener("change", async (ev) => {
+  folderInput.addEventListener("change", async () => {
     const files = Array.from(folderInput.files || []);
     if (!files.length) {
       setStatus("NO FOLDER SELECTED");
@@ -729,7 +739,6 @@ audio.addEventListener("timeupdate", () => {
   const t = tracks[currentIndex];
   const doc = trackLyrics.get(t.id);
   highlightCurrent(doc, audio.currentTime);
-  updateMediaSessionPosition();
 });
 
 audio.addEventListener("play", updatePlayButton);
@@ -781,9 +790,7 @@ btnOnlineTranslate.addEventListener("click", () => {
 });
 
 
-// ---------- Media Session (Android lockscreen / headset) ----------
-let mediaSessionReady = false;
-
+// ---------- Next/Prev + Media Session (Android lockscreen / headset) ----------
 function goNext(play=true){
   if (!tracks.length) return;
   const ni = Math.min(tracks.length - 1, currentIndex + 1);
@@ -800,29 +807,12 @@ function goPrev(play=true){
 }
 
 function ensureMediaSession(){
-  if (mediaSessionReady) return;
   if (!("mediaSession" in navigator)) return;
-  mediaSessionReady = true;
-
   try{
-    navigator.mediaSession.setActionHandler("play", async () => {
-      try{ await audio.play(); }catch(_){}
-      updatePlayButton();
-    });
-    navigator.mediaSession.setActionHandler("pause", () => {
-      audio.pause();
-      updatePlayButton();
-    });
-    navigator.mediaSession.setActionHandler("stop", () => {
-      audio.pause();
-      audio.currentTime = 0;
-      updatePlayButton();
-    });
-    navigator.mediaSession.setActionHandler("previoustrack", () => goPrev(true));
+    navigator.mediaSession.setActionHandler("play", async () => { try{ await audio.play(); }catch(_){} updatePlayButton(); });
+    navigator.mediaSession.setActionHandler("pause", () => { audio.pause(); updatePlayButton(); });
     navigator.mediaSession.setActionHandler("nexttrack", () => goNext(true));
-    navigator.mediaSession.setActionHandler("seekto", (details) => {
-      if (details && typeof details.seekTime === "number") audio.currentTime = details.seekTime;
-    });
+    navigator.mediaSession.setActionHandler("previoustrack", () => goPrev(true));
   }catch(_){}
 }
 
@@ -831,23 +821,7 @@ function updateMediaSessionMeta(track){
   if (!("mediaSession" in navigator)) return;
   ensureMediaSession();
   try{
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.name || "Track",
-      artist: "",
-      album: "LyricsPocket",
-    });
-  }catch(_){}
-}
-
-function updateMediaSessionPosition(){
-  if (!("mediaSession" in navigator)) return;
-  if (!navigator.mediaSession || !navigator.mediaSession.setPositionState) return;
-  try{
-    navigator.mediaSession.setPositionState({
-      duration: isFinite(audio.duration) ? audio.duration : 0,
-      playbackRate: audio.playbackRate || 1,
-      position: isFinite(audio.currentTime) ? audio.currentTime : 0
-    });
+    navigator.mediaSession.metadata = new MediaMetadata({ title: track.name || "Track", artist: "", album: "LyricsPocket" });
   }catch(_){}
 }
 
