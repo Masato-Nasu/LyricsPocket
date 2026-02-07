@@ -36,6 +36,8 @@ let translationCache = new Map(); // key: text -> jp
 let tracks = []; // {id, file, name, title, normBase}
 let lyricsFiles = []; // {file, name, normBase, kind}
 let trackLyrics = new Map(); // trackId -> {kind, lines[]}
+let trackLyricsSource = new Map(); // trackId -> lyrics file name
+
 let currentIndex = -1;
 
 const audio = new Audio();
@@ -67,6 +69,8 @@ function normalizeBase(name) {
   let x = name.toLowerCase();
   // strip extension if exists
   x = x.replace(/\.[a-z0-9]+$/i, "");
+  // strip leading track numbers like "01 - "
+  x = x.replace(/^\s*\d{1,3}\s*[-_.]*\s*/g, "");
   // remove (...) and [...]
   x = x.replace(/\(.*?\)/g, " ").replace(/\[.*?\]/g, " ");
   // remove non-alnum -> spaces
@@ -174,6 +178,54 @@ function tryAutoLink(track) {
   return best;
 }
 
+function getPersistedLyricsName(track){
+  try{
+    return localStorage.getItem("lplink:" + track.normBase) || "";
+  }catch(_){
+    return "";
+  }
+}
+
+function persistLyricsLink(track, lyricName){
+  try{
+    localStorage.setItem("lplink:" + track.normBase, lyricName);
+  }catch(_){}
+}
+
+function findBestLyricsFileForTrack(track){
+  // 1) strict by normalized base
+  const strict = tryAutoLink(track);
+  if (strict) return strict;
+
+  // 2) persisted (by filename)
+  const persisted = getPersistedLyricsName(track);
+  if (persisted) {
+    const byName = lyricsFiles.find(l => l.name === persisted);
+    if (byName) return byName;
+  }
+
+  // 3) fuzzy includes
+  const cand = lyricsFiles.filter(l => l.normBase && track.normBase && (l.normBase.includes(track.normBase) || track.normBase.includes(l.normBase)));
+  if (!cand.length) return null;
+  cand.sort((a,b)=> (a.kind==="lrc"?-1:1) - (b.kind==="lrc"?-1:1));
+  return cand[0] || null;
+}
+
+async function linkLyricsToTrack(track, lyric){
+  if (!track || !lyric || !lyric.file) return null;
+  try{
+    const text = await readTextFile(lyric.file);
+    const doc = (lyric.kind === "lrc") ? parseLRC(text) : parseTXT(text);
+    trackLyrics.set(track.id, doc);
+    trackLyricsSource.set(track.id, lyric.name);
+    persistLyricsLink(track, lyric.name);
+    return doc;
+  }catch(_){
+    return null;
+  }
+}
+
+
 // ---------- Rendering ----------
 function renderLyrics(doc) {
   lyricsList.innerHTML = "";
@@ -235,6 +287,10 @@ function highlightCurrent(doc, timeSec) {
       if (enEl && jpEl) {
         srcLine.textContent = enEl.textContent || "";
         jpLine.textContent = jpEl.textContent || (onlineTranslate ? "TRANSLATING..." : "TAP A LINE TO TRANSLATE");
+        if (onlineTranslate && (!jpEl.textContent || jpEl.textContent.trim().length===0)) {
+          // prioritize current line
+          ensureJPForLine(doc, bestId);
+        }
       }
     }
   }
@@ -293,6 +349,8 @@ btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
           const text = await readTextFile(l.file);
           const doc = (l.kind === "lrc") ? parseLRC(text) : parseTXT(text);
           trackLyrics.set(t.id, doc);
+      trackLyricsSource.set(t.id, best.name);
+      persistLyricsLink(t, best.name);
           if (currentIndex === i) renderLyrics(doc);
           setStatus(`${tracks.length} FILES LOADED | LYRICS LINKED`);
         }
@@ -391,6 +449,7 @@ function onTapLine(text, lineId) {
 }
 
 // ---------- Import audio ----------
+// AUTO_LINK_AFTER_AUDIO
 function importAudioFiles(files) {
   const audioFiles = files.filter(f => f.type.startsWith("audio/") || ["mp3","m4a","aac","wav","flac","ogg"].includes(ext(f.name)));
   if (!audioFiles.length) return;
@@ -412,6 +471,17 @@ function importAudioFiles(files) {
   setStatus(`${tracks.length} FILES LOADED`);
   renderTrackList();
 
+  // AUTO_LINK_AFTER_AUDIO: if lyrics are already imported, link them now
+  if (lyricsFiles.length) {
+    for (const t of tracks) {
+      if (trackLyrics.has(t.id)) continue;
+      const best = findBestLyricsFileForTrack(t);
+      if (best) {
+        linkLyricsToTrack(t, best);
+      }
+    }
+  }
+
   if (currentIndex === -1 && tracks.length) {
     selectTrack(0);
   }
@@ -424,6 +494,19 @@ async function importLyricsFiles(files) {
   }
 
   // try auto-link for all tracks
+  // AUTO_LINK_AFTER_LYRICS: robust best-match + persist
+  for (const t of tracks) {
+    if (trackLyrics.has(t.id)) continue;
+    const best2 = findBestLyricsFileForTrack(t);
+    if (best2) {
+      const text2 = await readTextFile(best2.file);
+      const doc2 = best2.kind === "lrc" ? parseLRC(text2) : parseTXT(text2);
+      trackLyrics.set(t.id, doc2);
+      trackLyricsSource.set(t.id, best2.name);
+      persistLyricsLink(t, best2.name);
+    }
+  }
+
   for (const t of tracks) {
     if (trackLyrics.has(t.id)) continue;
     const best = tryAutoLink(t);
@@ -431,6 +514,8 @@ async function importLyricsFiles(files) {
       const text = await readTextFile(best.file);
       const doc = best.kind === "lrc" ? parseLRC(text) : parseTXT(text);
       trackLyrics.set(t.id, doc);
+      trackLyricsSource.set(t.id, best.name);
+      persistLyricsLink(t, best.name);
     }
   }
 
@@ -472,6 +557,7 @@ async function importFromFolder() {
 }
 
 // ---------- Playback ----------
+// AUTO_LINK_LYRICS
 function selectTrack(index) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
@@ -483,6 +569,19 @@ function selectTrack(index) {
 
   const doc = trackLyrics.get(t.id);
   renderLyrics(doc || null);
+
+  // AUTO_LINK_LYRICS: when a track is selected/played, show its lyrics automatically
+  if (!doc && lyricsFiles.length) {
+    const bestLyric = findBestLyricsFileForTrack(t);
+    if (bestLyric) {
+      linkLyricsToTrack(t, bestLyric).then(created => {
+        if (created && currentIndex === index) {
+          renderLyrics(created);
+          setStatus(`${tracks.length} FILES LOADED | LYRICS LINKED`);
+        }
+      });
+    }
+  }
 
   // If not linked yet, try to link automatically (best-effort)
   if (!doc) {
