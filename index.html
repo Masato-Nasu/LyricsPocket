@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- OneFileReset v3: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- OneFileReset v4: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -118,7 +118,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">OneFileReset v3</span>
+      <span class="chip" style="opacity:.7">OneFileReset v4</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -140,11 +140,13 @@ a{color:rgba(160,220,255,.95)}
         ※歌詞は .lrc（タイムタグ）推奨。 .txt（タイム無し）も表示は可能（自動追従は不可）です。
       </div>
       <hr>
+      
       <div class="row">
-        <select id="selTrack">
-          <option value="">TRACK: (未選択)</option>
-        </select>
+        <div class="chip" id="curTrackChip" style="flex:1;min-width:260px;opacity:.9">TRACK: (未選択)</div>
+        <button id="btnShowTracks" class="btn secondary" type="button">CHOOSE TRACK</button>
       </div>
+      <div id="trackList" class="list" style="margin-top:10px; display:none; border:1px solid rgba(255,255,255,.14); border-radius:14px"></div>
+
       <div class="row" style="margin-top:10px">
         <select id="selLyric">
           <option value="">LYRICS: (未選択)</option>
@@ -212,7 +214,9 @@ a{color:rgba(160,220,255,.95)}
   const inAudio = $("inAudio");
   const inLyrics = $("inLyrics");
 
-  const selTrack = $("selTrack");
+  const curTrackChip = $("curTrackChip");
+  const btnShowTracks = $("btnShowTracks");
+  const trackList = $("trackList");
   const selLyric = $("selLyric");
   const btnLink = $("btnLink");
   const btnUnlink = $("btnUnlink");
@@ -462,15 +466,23 @@ a{color:rgba(160,220,255,.95)}
     }
   }
 
-  function rebuildTrackSelect(){
-    selTrack.innerHTML = '<option value="">TRACK: (未選択)</option>';
-    tracks.forEach((t, i) => {
-      const opt = document.createElement("option");
-      opt.value = String(i);
-      opt.textContent = t.name.split("/").pop();
-      selTrack.appendChild(opt);
+  function rebuildTrackList(){
+    trackList.innerHTML = "";
+    if (!tracks.length){
+      curTrackChip.textContent = "TRACK: (未選択)";
+      return;
+    }
+    tracks.forEach((t,i)=>{
+      const div = document.createElement("div");
+      div.className = "item" + (i===trackIndex ? " current":"");
+      div.innerHTML = `<div class="t">${escapeHTML(t.name.split("/").pop())}</div>`;
+      div.addEventListener("click", ()=>{
+        selectTrack(i, false);
+        trackList.style.display = "none";
+      });
+      trackList.appendChild(div);
     });
-    if (trackIndex>=0) selTrack.value = String(trackIndex);
+    curTrackChip.textContent = "TRACK: " + tracks[trackIndex]?.name.split("/").pop();
   }
 
   function importAudioFiles(files){
@@ -486,7 +498,7 @@ a{color:rgba(160,220,255,.95)}
     }
     tracks = list;
     trackIndex = 0;
-    rebuildTrackSelect();
+    rebuildTrackList();
     setStatus(`FILES LOADED: ${tracks.length}`);
     selectTrack(0, false);
   }
@@ -494,7 +506,7 @@ a{color:rgba(160,220,255,.95)}
   function selectTrack(i, autoPlay){
     if (i<0 || i>=tracks.length) return;
     trackIndex = i;
-    rebuildTrackSelect();
+    rebuildTrackList();
     const tr = tracks[trackIndex];
     audio.pause();
     audio.src = tr.url;
@@ -640,10 +652,11 @@ a{color:rgba(160,220,255,.95)}
     inLyrics.value = "";
   });
 
-  selTrack.addEventListener("change", () => {
-    const v = selTrack.value;
-    if (v === "") return;
-    selectTrack(Number(v), false);
+  btnShowTracks.addEventListener("click", () => {
+    if (!tracks.length){ alert("まずFILESで音声ファイルを読み込んでください。"); return; }
+    trackList.style.display = (trackList.style.display === "none") ? "block" : "none";
+    rebuildTrackList();
+  });
   });
 
   selLyric.addEventListener("change", () => {
@@ -717,7 +730,7 @@ a{color:rgba(160,220,255,.95)}
 
   // Initial UI
   listEl.style.display = "block";
-  setStatus("READY (OneFileReset v3)");
+  setStatus("READY (OneFileReset v4)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>
