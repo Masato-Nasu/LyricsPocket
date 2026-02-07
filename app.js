@@ -631,7 +631,7 @@ function selectTrack(index) {
       // still on the same track?
       if (currentIndex === index) {
         renderLyrics(d);
-        setStatus(`${tracks.length} FILES LOADED | LYRICS AUTO`);
+        setStatus(`${tracks.length} FILES LOADED | ${currentIndex+1}/${tracks.length} | LYRICS AUTO`);
       }
     });
   }
