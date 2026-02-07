@@ -43,6 +43,26 @@ audio.preload = "metadata";
 audio.playsInline = true;
 
 // ---------- Utils ----------
+function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+function cacheGet(key){
+  if (translationCache.has(key)) return translationCache.get(key);
+  try{
+    const v = localStorage.getItem("lpjp:" + key);
+    if (v) {
+      translationCache.set(key, v);
+      return v;
+    }
+  }catch(_){}
+  return null;
+}
+function cacheSet(key, val){
+  translationCache.set(key, val);
+  try{
+    localStorage.setItem("lpjp:" + key, val);
+  }catch(_){}
+}
+
 function normalizeBase(name) {
   let x = name.toLowerCase();
   // strip extension if exists
@@ -122,6 +142,19 @@ async function readTextFile(file) {
 }
 
 // ---------- Auto link lyrics ----------
+function ensureLyricsForTrack(track){
+  if (!track) return null;
+  if (trackLyrics.has(track.id)) return null;
+
+  const strict = tryAutoLink(track);
+  if (strict) return strict;
+
+  const candidates = lyricsFiles.filter(l => l.normBase && track.normBase && (l.normBase.includes(track.normBase) || track.normBase.includes(l.normBase)));
+  if (!candidates.length) return null;
+  candidates.sort((a,b)=> (a.kind==="lrc"?-1:1) - (b.kind==="lrc"?-1:1));
+  return candidates[0] || null;
+}
+
 async function loadLyricsFile(file) {
   const name = file.name;
   const kind = ext(name) === "lrc" ? "lrc" : "txt";
@@ -153,12 +186,26 @@ function renderLyrics(doc) {
   lyricsList.style.display = "flex";
 
   for (const line of doc.lines) {
-    const div = document.createElement("div");
-    div.className = "line";
-    div.dataset.id = String(line.id);
-    div.textContent = line.text || " ";
-    div.addEventListener("click", () => onTapLine(line.text || ""));
-    lyricsList.appendChild(div);
+    const item = document.createElement("div");
+    item.className = "lineItem";
+    item.dataset.id = String(line.id);
+
+    const en = document.createElement("div");
+    en.className = "line en";
+    en.textContent = line.text || " ";
+    en.addEventListener("click", () => onTapLine(line.text || "", line.id));
+
+    const jp = document.createElement("div");
+    jp.className = "jp mono faint";
+    jp.textContent = "";
+
+    item.appendChild(en);
+    item.appendChild(jp);
+    lyricsList.appendChild(item);
+  }
+
+  if (onlineTranslate) {
+    startAutoTranslate(doc);
   }
 }
 
@@ -173,17 +220,21 @@ function highlightCurrent(doc, timeSec) {
   const children = lyricsList.children;
   for (let i = 0; i < children.length; i++) {
     const el = children[i];
-    if (!el.classList) continue;
     const isCurrent = Number(el.dataset.id) === bestId;
     el.classList.toggle("current", isCurrent);
     if (isCurrent) {
-      // gentle autoscroll: keep near center
       const rect = el.getBoundingClientRect();
       const containerRect = lyricsList.getBoundingClientRect();
       const topThreshold = containerRect.top + containerRect.height * 0.25;
       const bottomThreshold = containerRect.top + containerRect.height * 0.75;
       if (rect.top < topThreshold || rect.bottom > bottomThreshold) {
         el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+      const enEl = el.querySelector(".line.en");
+      const jpEl = el.querySelector(".jp");
+      if (enEl && jpEl) {
+        srcLine.textContent = enEl.textContent || "";
+        jpLine.textContent = jpEl.textContent || (onlineTranslate ? "TRANSLATING..." : "TAP A LINE TO TRANSLATE");
       }
     }
   }
@@ -261,7 +312,7 @@ btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
 }
 
 // ---------- Translation ----------
-async function translateToJP(text) {
+async function translateToJP(text, lineId = null) {
   const trimmed = (text || "").trim();
   if (!trimmed) return;
 
@@ -335,8 +386,8 @@ async function translateToJP(text) {
   }
 }
 
-function onTapLine(text) {
-  translateToJP(text);
+function onTapLine(text, lineId) {
+  translateToJP(text, lineId);
 }
 
 // ---------- Import audio ----------
@@ -432,6 +483,20 @@ function selectTrack(index) {
 
   const doc = trackLyrics.get(t.id);
   renderLyrics(doc || null);
+
+  // If not linked yet, try to link automatically (best-effort)
+  if (!doc) {
+    const hint = ensureLyricsForTrack(t);
+    if (hint && hint.file) {
+      readTextFile(hint.file).then(text => {
+        const created = (hint.kind === "lrc") ? parseLRC(text) : parseTXT(text);
+        trackLyrics.set(t.id, created);
+        if (currentIndex === index) renderLyrics(created);
+        setStatus(`${tracks.length} FILES LOADED | LYRICS LINKED`);
+      }).catch(()=>{});
+    }
+  }
+
   srcLine.textContent = "";
   jpLine.textContent = "TAP A LINE TO TRANSLATE";
 }
@@ -536,6 +601,16 @@ btnOnlineTranslate.addEventListener("click", () => {
   btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
   if (!onlineTranslate) {
     jpLine.textContent = "TAP A LINE TO TRANSLATE";
+    autoTranslateToken++; // cancel
+    // clear JP under lines
+    const nodes = lyricsList.querySelectorAll(".jp");
+    nodes.forEach(n=> n.textContent = "");
+  } else {
+    if (currentIndex >= 0) {
+      const t = tracks[currentIndex];
+      const doc = trackLyrics.get(t.id);
+      if (doc) startAutoTranslate(doc);
+    }
   }
 });
 
