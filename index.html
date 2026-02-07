@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=fix4b">
+<link rel="manifest" href="./manifest.webmanifest?v=fix6c">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -83,7 +83,7 @@ label.btn{gap:8px}
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket v1.3 (FIX6b → TANGO-CHO)</div>
+  <div class="h1">LyricsPocket v1.3 (FIX6cb → TANGO-CHO)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
   <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります。</div>
 
@@ -138,6 +138,25 @@ JP:</div>
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
+
+function decorateLyricHTML(text, lineIndex){
+  // Wrap each English-ish word in a clickable span to send to TANGO-CHO.
+  const s = String(text||"");
+  const reW = /[A-Za-z][A-Za-z'\-’]*/g;
+  let out = "";
+  let last = 0;
+  let mm;
+  while ((mm = reW.exec(s)) !== null){
+    const a = mm.index;
+    const b = a + mm[0].length;
+    out += esc(s.slice(last, a));
+    const w = mm[0];
+    out += '<span class="wlink" data-w="'+esc(w)+'" data-i="'+String(lineIndex)+'">'+esc(w)+'</span>';
+    last = b;
+  }
+  out += esc(s.slice(last));
+  return out;
+}
 const inAudio = $("inAudio");
 const inLyrics = $("inLyrics");
 const audioEl = $("audio");
@@ -195,7 +214,7 @@ function extractWords(en){
     const key = w.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    if (w.length > 32) continue;
+    if (w.length > 24) continue;
     out.push(w);
     if (out.length >= 80) break;
   }
@@ -218,25 +237,6 @@ function renderWordChips(en){
     b.dataset.w = w;
     wordChipsEl.appendChild(b);
   }
-}
-
-function decorateLyricHTML(text, lineIndex){
-  // Wrap each English-ish word in a clickable span to send to TANGO-CHO.
-  const s = String(text||"");
-  const reW = /[A-Za-z][A-Za-z'\-’]*/g;
-  let out = "";
-  let last = 0;
-  let mm;
-  while ((mm = reW.exec(s)) !== null){
-    const a = mm.index;
-    const b = a + mm[0].length;
-    out += esc(s.slice(last, a));
-    const w = mm[0];
-    out += '<span class="wlink" data-w="'+esc(w)+'" data-i="'+String(lineIndex)+'">'+esc(w)+'</span>';
-    last = b;
-  }
-  out += esc(s.slice(last));
-  return out;
 }
 
 function pushInbox(word, example){
@@ -420,8 +420,7 @@ renderWordChips("");
     div.className = "lyLine" + (i===currentLineIndex ? " current":"");
     div.dataset.i = String(i);
     div.innerHTML =
-      '<div class="en">'+decorateLyricHTML(ln.en, i)+'</div>' +
-      '<div class="jp">'+(jpOn ? esc(ln.jp||"") : "")+'</div>';
+      '<div class="en">'+decorateLyricHTML(ln.en, i)+'</div>' +'<div class="jp">'+(jpOn ? esc(ln.jp||"") : "")+'</div>';
     panelLyrics.appendChild(div);
   }
 }
@@ -653,11 +652,10 @@ lyricListEl.addEventListener("change", (e)=>{
   loadLyricsKey(key);
 });
 
-
 panelLyrics.addEventListener("click", (e)=>{
-  const t = e.target;
+    const t = e.target;
 
-  // word click
+  // WORD click → send to TANGO-CHO
   if (t && t.classList && t.classList.contains("wlink")){
     const w = t.dataset ? t.dataset.w : "";
     const li = t.dataset ? parseInt(t.dataset.i,10) : -1;
@@ -666,15 +664,9 @@ panelLyrics.addEventListener("click", (e)=>{
     sendToTangoCho(w, ex);
     return;
   }
-
-  // line click
-  const row = t && t.closest ? t.closest(".lyLine") : null;
+  const row = e.target && e.target.closest ? e.target.closest(".lyLine") : null;
   if (!row) return;
   const i = parseInt(row.dataset.i,10);
-  if (!isFinite(i)) return;
-  highlightLine(i);
-  maybeTranslateLine(i);
-});
   if (!isFinite(i)) return;
   highlightLine(i);
   maybeTranslateLine(i);
@@ -730,8 +722,19 @@ wordChipsEl.addEventListener("click", (e)=>{
   sendToTangoCho(w, ex);
 });
 
+window.addEventListener("error", (ev)=>{
+  try{
+    setStatus("APP ERROR: " + (ev && ev.message ? ev.message : "unknown"));
+  }catch(e){}
+});
+window.addEventListener("unhandledrejection", (ev)=>{
+  try{
+    setStatus("APP ERROR: " + (ev && ev.reason ? (ev.reason.name||ev.reason.message||String(ev.reason)) : "promise"));
+  }catch(e){}
+});
+
 // init
-setStatus("JS OK (FIX6b TANGO)");
+setStatus("JS OK (FIX6cb TANGO)");
 setCur("","");
 renderWordChips("");
 renderTrackList();
