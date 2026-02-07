@@ -39,7 +39,20 @@ let lyricsFiles = []; // {file, name, normBase, kind}
 let trackLyrics = new Map(); // trackId -> {kind, lines[]}
 let currentIndex = -1;
 
-const audio = new Audio();
+const audio = $("audioEl") || new Audio();
+audio.preload = "metadata";
+audio.playsInline = true;
+audio.volume = 1.0;
+
+audio.addEventListener("error", () => {
+  const err = audio.error;
+  const code = err ? err.code : 0;
+  setStatus(`AUDIO ERROR code=${code} (file may be unsupported)`);
+});
+audio.addEventListener("stalled", () => setStatus("AUDIO STALLED"));
+audio.addEventListener("waiting", () => setStatus("AUDIO BUFFERING..."));
+audio.addEventListener("playing", () => setStatus(`${tracks.length} FILES LOADED | PLAYING`));
+
 
 // Robust play helper (avoids Android Chrome play()/pause() interruption crash overlays)
 async function safePlay() {
@@ -47,18 +60,21 @@ async function safePlay() {
     await audio.play();
     return true;
   } catch (e) {
+    const name = e?.name || "";
     const msg = String(e?.message || e || "");
+    setStatus(`PLAY FAILED: ${name || "Error"}`);
     // Common non-fatal race: play() interrupted by pause() / AbortError
-    if (/interrupted by a call to pause\(\)/i.test(msg) || /AbortError/i.test(msg)) {
+    if (/interrupted by a call to pause\(\)/i.test(msg) || /AbortError/i.test(name) || /AbortError/i.test(msg)) {
       await sleep(120);
-      try {
-        await audio.play();
-        return true;
-      } catch (_) {
-        return false;
-      }
+      try { await audio.play(); return true; } catch (_) { return false; }
     }
-    // NotAllowedError happens if user hasn't interacted yet
+    // Autoplay / gesture restriction
+    if (/NotAllowedError/i.test(name) || /NotAllowedError/i.test(msg)) {
+      alert("再生がブロックされました。画面を一度タップしてから、PLAYを押してください。");
+      return false;
+    }
+    alert(`再生できません: ${name}
+${msg}`);
     return false;
   }
 }
@@ -595,6 +611,7 @@ function selectTrack(index) {
   const t = tracks[index];
   audio.src = t.url;
   audio.currentTime = 0;
+  try{ audio.load(); }catch(_){ }
   updatePlayButton();
   setStatus(`${tracks.length} FILES LOADED | ${t.title}`);
 
