@@ -43,43 +43,6 @@ audio.preload = "metadata";
 audio.playsInline = true;
 
 // ---------- Utils ----------
-const DB_NAME = "lyricspocket";
-const DB_STORE = "handles";
-
-function idbOpen(){
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function idbSet(key, val){
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, "readwrite");
-    tx.objectStore(DB_STORE).put(val, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function idbGet(key){
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, "readonly");
-    const req = tx.objectStore(DB_STORE).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
-
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
 function cacheKey(text){ return "lpjp:" + text; }
@@ -228,6 +191,38 @@ async function readTextFile(file) {
 }
 
 // ---------- Auto link lyrics ----------
+function findBestLyricsFileForTrack(track){
+  if (!track) return null;
+  // strict match first
+  const strict = lyricsFiles.find(l => l.normBase && l.normBase === track.normBase) || null;
+  if (strict) return strict;
+  // fuzzy includes
+  const cand = lyricsFiles.filter(l => l.normBase && track.normBase && (l.normBase.includes(track.normBase) || track.normBase.includes(l.normBase)));
+  if (!cand.length) return null;
+  cand.sort((a,b)=> (a.kind==="lrc"?-1:1) - (b.kind==="lrc"?-1:1));
+  return cand[0] || null;
+}
+
+async function ensureLyricsForTrack(track){
+  if (!track) return null;
+  // already parsed & linked?
+  const existing = trackLyrics.get(track.id);
+  if (existing) return existing;
+
+  const best = findBestLyricsFileForTrack(track);
+  if (!best || !best.file) return null;
+
+  try{
+    const text = await readTextFile(best.file);
+    const doc = (best.kind === "lrc") ? parseLRC(text) : parseTXT(text);
+    trackLyrics.set(track.id, doc);
+    return doc;
+  }catch(_){
+    return null;
+  }
+}
+
+
 async function loadLyricsFile(file) {
   const name = file.name;
   const kind = ext(name) === "lrc" ? "lrc" : "txt";
@@ -248,48 +243,6 @@ function tryAutoLink(track) {
 }
 
 // ---------- Rendering ----------
-async function autoShowLyricsForTrack(track, forceFromDir=false){
-  if (!track) return;
-  // already linked?
-  const existing = trackLyrics.get(track.id);
-  if (existing) {
-    renderLyrics(existing);
-    return;
-  }
-
-  // 1) match among already imported lyrics files
-  const strict = lyricsFiles.find(l => l.normBase === track.normBase) || null;
-  const fuzzy = strict ? null : (lyricsFiles.find(l => l.normBase && (l.normBase.includes(track.normBase) || track.normBase.includes(l.normBase))) || null);
-  const best = strict || fuzzy;
-  if (best && best.file) {
-    try{
-      const text = await readTextFile(best.file);
-      const doc = best.kind === "lrc" ? parseLRC(text) : parseTXT(text);
-      trackLyrics.set(track.id, doc);
-      renderLyrics(doc);
-      return;
-    }catch(_){}
-  }
-
-  // 2) if we have a saved directory handle, try to fetch lyrics file on-demand
-  if (forceFromDir || dirHandle) {
-    const entry = await findLyricsInDirByNormBase(track.normBase);
-    if (entry) {
-      try{
-        const file = await entry.getFile();
-        const text = await readTextFile(file);
-        const e = ext(file.name);
-        const doc = (e === "lrc") ? parseLRC(text) : parseTXT(text);
-        trackLyrics.set(track.id, doc);
-        // also register into lyricsFiles list so it appears "loaded"
-        lyricsFiles.push({ name: file.name, file, kind: (e==="lrc"?"lrc":"txt"), normBase: normalizeBase(file.name) });
-        renderLyrics(doc);
-        return;
-      }catch(_){}
-    }
-  }
-}
-
 function renderLyrics(doc) {
   lyricsList.innerHTML = "";
   currentLineId = -1;
@@ -591,7 +544,7 @@ function importAudioFiles(files) {
   }
 }
 
-async function importLyricsFiles(files) {
+async function importLyricsFiles /* AUTO_LINK_AFTER_LYRICS2 */(files) {
   const lyricFiles = files.filter(f => ["txt","lrc"].includes(ext(f.name)) || f.type === "text/plain");
   for (const f of lyricFiles) {
     await loadLyricsFile(f);
@@ -615,44 +568,47 @@ async function importLyricsFiles(files) {
     if (doc) renderLyrics(doc);
   }
 
-  setStatus(`${tracks.length} FILES LOADED | LYRICS UPDATED`);
+  // AUTO_LINK_AFTER_LYRICS2: prime mapping so track selection is instant
+  for (const t of tracks) {
+    if (trackLyrics.has(t.id)) continue;
+    const best = findBestLyricsFileForTrack(t);
+    if (best && best.file) {
+      try{
+        const text = await readTextFile(best.file);
+        const doc = (best.kind === "lrc") ? parseLRC(text) : parseTXT(text);
+        trackLyrics.set(t.id, doc);
+      }catch(_){}
+    }
+  }
+
+setStatus(`${tracks.length} FILES LOADED | LYRICS UPDATED`);
 }
 
 // ---------- Folder import (progressive enhancement) ----------
 async function importFromFolder() {
-  // Android/Chromium: prefer File System Access API (directory handle)
-  if ("showDirectoryPicker" in window) {
-    try {
-      const dir = await window.showDirectoryPicker();
-      await saveDirHandle(dir);
-
-      const audioCollected = [];
-      const lyricCollected = [];
-
-      for await (const entry of dir.values()) {
-        if (entry.kind !== "file") continue;
-        const file = await entry.getFile();
-        const e = ext(file.name);
-        if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || (file.type && file.type.startsWith("audio/"))) audioCollected.push(file);
-        if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
-      }
-
-      importAudioFiles(audioCollected);
-      await importLyricsFiles(lyricCollected);
-
-      // If a track is already selected, auto-show its lyrics now
-      if (currentIndex >= 0) {
-        const t = tracks[currentIndex];
-        await autoShowLyricsForTrack(t, true);
-      }
-      return;
-    } catch (e) {
-      // cancelled or not allowed -> fallback below
-    }
+  // showDirectoryPicker is part of File System Access API; not supported on iOS Safari/PWA
+  if (!("showDirectoryPicker" in window)) {
+    alert("このブラウザはフォルダ選択に未対応です。FILESで複数ファイルを選択してください。");
+    return;
   }
+  try {
+    const dir = await window.showDirectoryPicker();
+    const audioCollected = [];
+    const lyricCollected = [];
 
-  // Fallbacks (some environments won't support folder picking)
-  alert("この環境ではフォルダ選択が利用できません。FILES / LYRICS で読み込んでください。");
+    for await (const entry of dir.values()) {
+      if (entry.kind !== "file") continue;
+      const file = await entry.getFile();
+      const e = ext(file.name);
+      if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || file.type.startsWith("audio/")) audioCollected.push(file);
+      if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
+    }
+
+    importAudioFiles(audioCollected);
+    await importLyricsFiles(lyricCollected);
+  } catch (e) {
+    // user cancelled
+  }
 }
 
 // ---------- Playback ----------
@@ -665,20 +621,28 @@ function selectTrack(index) {
   updatePlayButton();
   setStatus(`${tracks.length} FILES LOADED | ${t.title}`);
 
-  const doc = trackLyrics.get(t.id);
+  let doc = trackLyrics.get(t.id);
   renderLyrics(doc || null);
-  // Auto-select and show lyrics immediately when a track is selected
-  autoShowLyricsForTrack(t);
-srcLine.textContent = "";
+
+  // Auto-select lyrics when a track is selected (based on already-imported lyrics files)
+  if (!doc) {
+    ensureLyricsForTrack(t).then(d => {
+      if (!d) return;
+      // still on the same track?
+      if (currentIndex === index) {
+        renderLyrics(d);
+        setStatus(`${tracks.length} FILES LOADED | LYRICS AUTO`);
+      }
+    });
+  }
+  srcLine.textContent = "";
   jpLine.textContent = "TAP A LINE TO TRANSLATE";
 }
 
 btnPlay.addEventListener("click", async () => {
   if (!tracks.length) return;
   if (currentIndex === -1) selectTrack(0);
-    await autoShowLyricsForTrack(tracks[currentIndex]);
-  if (audio.paused) await autoShowLyricsForTrack(tracks[currentIndex]);
-    await audio.play();
+  if (audio.paused) await audio.play();
   else audio.pause();
   updatePlayButton();
 });
