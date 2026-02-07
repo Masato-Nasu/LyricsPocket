@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LyricsPocket Rescue</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; padding:18px; background:#0b0e14; color:#e5e7eb}
+pre{white-space:pre-wrap; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); padding:12px; border-radius:12px}
+a{color:#93c5fd}
+</style>
+</head>
+<body>
+<h2>Rescue: SW / Cache Reset</h2>
+<p>「白画面」「SWが真っ白」「反映がおかしい」時だけ使ってください。自動で戻ります。</p>
+<pre id="log">starting...</pre>
+<script>
+(async function(){
+  const el = document.getElementById("log");
+  const log = (t)=>{ el.textContent += "\n" + t; };
+
+  try{
+    // 1) unregister all SW
+    if ("serviceWorker" in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      log("SW regs: " + regs.length);
+      for (const r of regs){
+        try{ await r.unregister(); log("unregister: ok"); }catch(e){ log("unregister: err"); }
+      }
+    }else{
+      log("no serviceWorker API");
+    }
+
+    // 2) clear caches
+    if (window.caches){
+      const keys = await caches.keys();
+      log("caches: " + keys.length);
+      for (const k of keys){
+        try{ await caches.delete(k); log("cache delete: " + k); }catch(e){ log("cache delete: err"); }
+      }
+    }else{
+      log("no CacheStorage");
+    }
+
+    // 3) register safe SW (optional)
+    if ("serviceWorker" in navigator){
+      try{
+        const reg = await navigator.serviceWorker.register("./sw.js", {scope:"./"});
+        log("register safe sw: ok");
+        try{ await reg.update(); }catch(e){}
+      }catch(e){
+        log("register safe sw: failed: " + String(e));
+      }
+    }
+  }catch(e){
+    log("ERROR: " + String(e));
+  }
+
+  // back to app (cache bust)
+  const u = new URL("./index.html", location.href);
+  u.searchParams.set("v", String(Date.now()));
+  log("\nredirecting...");
+  setTimeout(()=>location.href = u.toString(), 650);
+})();
+</script>
+</body>
+</html>

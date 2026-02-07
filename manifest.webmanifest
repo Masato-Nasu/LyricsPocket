@@ -1,8 +1,8 @@
 {
-  "name":"LyricsPocket STABLE 1.3 CLEAN4",
+  "name": "LyricsPocket v1.3 SIMPLE",
   "short_name": "LyricsPocket",
-  "start_url":"./index.html?clean4=1",
-  "scope":"./",
+  "start_url": "./index.html?v=1",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
   "theme_color": "#0b0e14",

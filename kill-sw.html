@@ -3,12 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Reset</title>
-<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; padding:18px} pre{white-space:pre-wrap}</style>
+<title>SW Reset</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; padding:18px}
+pre{white-space:pre-wrap}
+</style>
 </head>
 <body>
-<h2>Cache Reset</h2>
-<p>このページはUIからは出しません（緊急用）。実行後 index.html に戻ります。</p>
+<h2>Service Worker / Cache Reset</h2>
+<p>実行後、自動で index.html に戻ります。</p>
 <pre id="log">working...</pre>
 <script>
 (async function(){
@@ -16,14 +19,23 @@
   try{
     if ("serviceWorker" in navigator){
       const regs = await navigator.serviceWorker.getRegistrations();
-      for (const r of regs){ try{ await r.unregister(); log("unregister ok"); }catch(e){ log("unregister err"); } }
+      for (const r of regs){
+        try{ await r.unregister(); log("unregister ok"); }catch(e){ log("unregister err"); }
+      }
+    }else{
+      log("no serviceWorker");
     }
     if (window.caches){
       const keys = await caches.keys();
-      for (const k of keys){ try{ await caches.delete(k); log("cache delete: "+k); }catch(e){} }
+      for (const k of keys){
+        try{ await caches.delete(k); log("cache delete: "+k); }catch(e){}
+      }
     }
-  }catch(e){ log("error: "+String(e)); }
-  location.href = "./index.html?reset=" + Date.now();
+  }catch(e){
+    log("error: " + String(e));
+  }
+  const bust = "v=" + Date.now();
+  location.href = "./index.html?" + bust;
 })();
 </script>
 </body>
