@@ -37,3 +37,9 @@ python -m http.server 8000
 ## samples
 
 `samples/` にダミーの歌詞ファイルを同梱しています（著作物は含みません）。
+
+
+## AndroidのFOLDERについて（重要）
+
+Androidでは環境によって `showDirectoryPicker()` が出ないため、v3では `webkitdirectory`（フォルダ選択の代替）も使います。
+フォルダが選べない場合は、`FILES` と `LYRICS` の複数選択で運用してください。

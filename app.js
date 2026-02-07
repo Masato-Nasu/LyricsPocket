@@ -21,6 +21,7 @@ const btnLyrics = $("btnLyrics");
 const btnList = $("btnList");
 
 const inputAudio = $("inputAudio");
+const inputDir = $("inputDir");
 const inputLyrics = $("inputLyrics");
 
 const dlgList = $("dlgList");
@@ -381,29 +382,44 @@ async function importLyricsFiles(files) {
 
 // ---------- Folder import (progressive enhancement) ----------
 async function importFromFolder() {
-  // showDirectoryPicker is part of File System Access API; not supported on iOS Safari/PWA
-  if (!("showDirectoryPicker" in window)) {
-    alert("このブラウザはフォルダ選択に未対応です。FILESで複数ファイルを選択してください。");
+  // Best effort:
+  // 1) showDirectoryPicker (Chromium desktop / 일부 Android)
+  // 2) webkitdirectory file input (Android Chrome / Chromium)
+  // iOS: neither is reliable -> guide to FILES.
+  if (isIOS) {
+    alert("iPhone/iPadではフォルダ選択が未対応です。FILESで音声を複数選択してください。");
     return;
   }
-  try {
-    const dir = await window.showDirectoryPicker();
-    const audioCollected = [];
-    const lyricCollected = [];
 
-    for await (const entry of dir.values()) {
-      if (entry.kind !== "file") continue;
-      const file = await entry.getFile();
-      const e = ext(file.name);
-      if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || file.type.startsWith("audio/")) audioCollected.push(file);
-      if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
+  if ("showDirectoryPicker" in window) {
+    try {
+      const dir = await window.showDirectoryPicker();
+      const audioCollected = [];
+      const lyricCollected = [];
+
+      for await (const entry of dir.values()) {
+        if (entry.kind !== "file") continue;
+        const file = await entry.getFile();
+        const e = ext(file.name);
+        if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || file.type.startsWith("audio/")) audioCollected.push(file);
+        if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
+      }
+
+      importAudioFiles(audioCollected);
+      await importLyricsFiles(lyricCollected);
+      return;
+    } catch (e) {
+      // user cancelled or not allowed -> fallback
     }
-
-    importAudioFiles(audioCollected);
-    await importLyricsFiles(lyricCollected);
-  } catch (e) {
-    // user cancelled
   }
+
+  // Fallback: directory upload input
+  if (inputDir) {
+    inputDir.click();
+    return;
+  }
+
+  alert("この環境ではフォルダ選択が利用できません。FILES / LYRICS で読み込んでください。");
 }
 
 // ---------- Playback ----------
@@ -468,6 +484,16 @@ inputLyrics.addEventListener("change", async () => {
   await importLyricsFiles(files);
   inputLyrics.value = "";
 });
+
+// Directory upload (Android/Chromium fallback)
+if (inputDir) {
+  inputDir.addEventListener("change", async () => {
+    const files = Array.from(inputDir.files || []);
+    importAudioFiles(files);
+    await importLyricsFiles(files);
+    inputDir.value = "";
+  });
+}
 
 // LRC sync
 audio.addEventListener("timeupdate", () => {
