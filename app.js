@@ -1,1 +1,1 @@
-/* OneFileReset v1: JS is inlined in index.html */
+/* OneFileReset v2: JS is inlined in index.html */
