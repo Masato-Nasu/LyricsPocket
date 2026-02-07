@@ -10,7 +10,13 @@
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="stylesheet" href="./styles.css" />
 <style>.vhidden{position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;opacity:0;pointer-events:none;}</style>
+
+<style>
+.fileLabel{position:relative; display:inline-flex; align-items:center; justify-content:center;}
+.fileLabel input[type=file]{position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer;}
+</style>
 </head>
+
 <body>
   <main id="app" class="app">
     <header class="status">
@@ -36,18 +42,16 @@
 
     <footer class="controls">
       <button id="btnFolder" class="btn">FOLDER</button>
-      <button id="btnFiles" class="btn">FILES</button>
+      <label id="lblFiles" class="btn fileLabel">FILES
+</label>
       <button id="btnPlay" class="btn">PLAY</button>
       <button id="btnPrev" class="btn">PREV</button>
       <button id="btnNext" class="btn">NEXT</button>
-      <button id="btnLyrics" class="btn">LYRICS</button>
+      <label id="lblLyrics" class="btn fileLabel">LYRICS
+</label>
       <button id="btnList" class="btn">LIST</button>
     </footer>
-
-    <input id="inputAudio" class="vhidden" type="file" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,audio/*" multiple />
-    <input id="inputLyrics" class="vhidden" type="file" accept=".lrc,.txt,text/plain" multiple />
-
-    <dialog id="dlgList" class="dlg">
+<dialog id="dlgList" class="dlg">
       <div class="dlg__panel">
         <div class="dlg__head">
           <div class="mono">FILES</div>

@@ -13,11 +13,11 @@ const srcLine = $("srcLine");
 const jpLine = $("jpLine");
 
 const btnFolder = $("btnFolder");
-const btnFiles = $("btnFiles");
+const btnFiles = $("btnFiles") || $("lblFiles");
 const btnPlay = $("btnPlay");
 const btnPrev = $("btnPrev");
 const btnNext = $("btnNext");
-const btnLyrics = $("btnLyrics");
+const btnLyrics = $("btnLyrics") || $("lblLyrics");
 const btnList = $("btnList");
 
 const inputAudio = $("inputAudio");
@@ -633,22 +633,7 @@ btnNext.addEventListener("click", () => {
   updatePlayButton();
 });
 
-btnFiles.addEventListener("click", () => {
-  if (!inputAudio) return;
-  inputAudio.value = "";
-  // Some Android PWAs are picky: defer click to next frame
-  requestAnimationFrame(() => {
-    try { inputAudio.click(); }
-    catch(e){ alert("FILESが開けません。Chromeで開く/サイトデータ削除後に再インストールを試してください。"); }
-  });
 });
-btnLyrics.addEventListener("click", () => {
-  if (!inputLyrics) return;
-  inputLyrics.value = "";
-  requestAnimationFrame(() => {
-    try { inputLyrics.click(); }
-    catch(e){ alert("LYRICSが開けません。Chromeで開く/サイトデータ削除後に再インストールを試してください。"); }
-  });
 });
 btnFolder.addEventListener("click", () => importFromFolder());
 
@@ -730,7 +715,7 @@ btnOnlineTranslate.addEventListener("click", () => {
 // ---------- Service Worker ----------
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
   });
 }
 
