@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- SWRescue v4 DIAG: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- SWRescue v4.1 DIAG: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -135,7 +135,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">SWRescue v4 DIAG</span>
+      <span class="chip" style="opacity:.7">SWRescue v4.1 DIAG</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -149,16 +149,16 @@ a{color:rgba(160,220,255,.95)}
     <div class="head">IMPORT</div>
     <div class="body">
       <div class="row">
-        <input id="inFolder" type="file" webkitdirectory multiple />
-        <input id="inAudio" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg" multiple />
-        <input id="inLyrics" type="file" accept=".lrc,.txt,text/plain" multiple />
+        <input id="inFolder" type="file" webkitdirectory multiple style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0;" />
+        <input id="inAudio" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg" multiple style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0;" />
+        <input id="inLyrics" type="file" accept=".lrc,.txt,text/plain" multiple style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0;" />
       </div>
       <div class="row" style="margin-top:10px">
-        <button id="btnPickAudio" class="btn secondary" type="button">OPEN FILES (AUDIO)</button>
-        <button id="btnPickLyrics" class="btn secondary" type="button">OPEN FILES (LYRICS)</button>
-      </div>
+  <label for="inAudio" class="btn secondary" style="display:inline-flex;align-items:center;justify-content:center">AUDIOを選ぶ</label>
+  <label for="inLyrics" class="btn secondary" style="display:inline-flex;align-items:center;justify-content:center">LYRICSを選ぶ</label>
+</div>
       <div class="small" style="margin-top:8px">
-        iPhone(iOS)ではフォルダ選択が非対応のため、FILES/LYRICSで複数選択してください。<br>
+        iPhone(iOS)ではフォルダ選択が非対応のため、下の「AUDIOを選ぶ」「LYRICSを選ぶ」で複数選択してください。<br>
         ※歌詞は .lrc（タイムタグ）推奨。 .txt（タイム無し）も表示は可能（自動追従は不可）です。
       </div>
       <hr>
@@ -225,9 +225,7 @@ a{color:rgba(160,220,255,.95)}
 
   const status = $("status");
   const diag = $("diag");
-  const btnPickAudio = $("btnPickAudio");
-  const btnPickLyrics = $("btnPickLyrics");
-  const btnOnline = $("btnOnline");
+const btnOnline = $("btnOnline");
   const btnList = $("btnList");
   const btnPlay = $("btnPlay");
   const btnPrev = $("btnPrev");
@@ -698,11 +696,6 @@ const trackList = $("trackList");
     listEl.style.display = listOn ? "block" : "none";
     btnList.textContent = "LIST: " + (listOn ? "ON" : "OFF");
   });
-
-  
-  btnPickAudio && btnPickAudio.addEventListener("click", ()=>{ try{ inAudio.click(); }catch(e){} });
-  btnPickLyrics && btnPickLyrics.addEventListener("click", ()=>{ try{ inLyrics.click(); }catch(e){} });
-
 inFolder.addEventListener("change", () => {
     const files = Array.from(inFolder.files || []);
     importAudioFiles(files);
@@ -812,10 +805,10 @@ selLyric.addEventListener("change", () => {
   listEl.style.display = "block";
 
   // JS OK marker
-  setStatus("JS OK (SWRescue v4 DIAG)");
+  setStatus("JS OK (SWRescue v4.1 DIAG)");
   try{ const c = (navigator.serviceWorker && navigator.serviceWorker.controller) ? "YES" : "NO"; setStatus("SW controller: " + c);
   try{ setStatus(`TRACKS: ${tracks.length} / LYRICS: ${lyricsByBase.size}`); }catch(_){ } }catch(_){ }
-  setStatus("READY (SWRescue v4 DIAG)");
+  setStatus("READY (SWRescue v4.1 DIAG)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>
