@@ -633,8 +633,23 @@ btnNext.addEventListener("click", () => {
   updatePlayButton();
 });
 
-btnFiles.addEventListener("click", () => inputAudio.click());
-btnLyrics.addEventListener("click", () => inputLyrics.click());
+btnFiles.addEventListener("click", () => {
+  if (!inputAudio) return;
+  inputAudio.value = "";
+  // Some Android PWAs are picky: defer click to next frame
+  requestAnimationFrame(() => {
+    try { inputAudio.click(); }
+    catch(e){ alert("FILESが開けません。Chromeで開く/サイトデータ削除後に再インストールを試してください。"); }
+  });
+});
+btnLyrics.addEventListener("click", () => {
+  if (!inputLyrics) return;
+  inputLyrics.value = "";
+  requestAnimationFrame(() => {
+    try { inputLyrics.click(); }
+    catch(e){ alert("LYRICSが開けません。Chromeで開く/サイトデータ削除後に再インストールを試してください。"); }
+  });
+});
 btnFolder.addEventListener("click", () => importFromFolder());
 
 btnList.addEventListener("click", () => {

@@ -9,6 +9,7 @@
   <link rel="icon" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="stylesheet" href="./styles.css" />
+<style>.vhidden{position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;opacity:0;pointer-events:none;}</style>
 </head>
 <body>
   <main id="app" class="app">
@@ -43,8 +44,8 @@
       <button id="btnList" class="btn">LIST</button>
     </footer>
 
-    <input id="inputAudio" type="file" accept="audio/*" multiple hidden />
-    <input id="inputLyrics" type="file" accept=".lrc,.txt,text/plain" multiple hidden />
+    <input id="inputAudio" class="vhidden" type="file" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,audio/*" multiple />
+    <input id="inputLyrics" class="vhidden" type="file" accept=".lrc,.txt,text/plain" multiple />
 
     <dialog id="dlgList" class="dlg">
       <div class="dlg__panel">
