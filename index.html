@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=deepl2e">
+<link rel="manifest" href="./manifest.webmanifest?v=deepl2f">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -117,8 +117,7 @@ JP:</div>
       <div style="height:12px"></div>
       <div class="small">LYRICS</div>
       <div id="lyricList" class="list"></div>
-      <div class="small" style="margin-top:10px">曲と歌詞が自動一致しない場合：曲を選んでから、下のLYRICSをタップして切り替えてください（端末に保存します）。</div>
-    </div>
+</div>
 
     <div id="panelLyrics" class="list"></div>
   </div>
@@ -177,7 +176,10 @@ let albumSessionToken = 0; // increments when switching albums to ignore late as
      // {name,url}
 let trackIndex = -1;
 
-let lyricsMap = new Map(); // key -> {name, lines:[{t,en,jp}]}
+let lyricsMap = new Map();
+let lyricsLoaded = false;
+let lyricReaders = [];
+// key -> {name, lines:[{t,en,jp}]}
 let linkMap = loadLinkMap();
 
 let currentLines = [];
@@ -317,6 +319,35 @@ function clearTracks(){
   trackIndex = -1;
 }
 
+
+function clearLyricsHard(){
+  lyricsMap = new Map();
+  lyricsLoaded = false;
+  currentLines = [];
+  currentLineIndex = -1;
+  try{ panelLyrics.innerHTML = ""; }catch(e){}
+  try{ lyricListEl.innerHTML = ""; }catch(e){}
+  try{ setCur("",""); }catch(e){}
+  try{ renderWordChips(""); }catch(e){}
+}
+function abortLyricReaders(){
+  try{ for (const r of lyricReaders){ try{ r.abort(); }catch(e){} } }catch(e){}
+  lyricReaders = [];
+}
+function albumReset(msg){
+  albumSessionToken++;
+  abortLyricReaders();
+  try{ stopSync(); }catch(e){}
+  try{ audioEl.pause(); }catch(e){}
+  try{ audioEl.removeAttribute("src"); audioEl.load(); }catch(e){}
+  try{ clearLyricsHard(); }catch(e){}
+  // reset link map to avoid cross-album mismatch
+  try{ linkMap = new Map(); localStorage.removeItem("lp_link_map_v13"); }catch(e){}
+  try{ inLyrics.value=""; }catch(e){}
+  try{ chipTrack.textContent="TRACK: (未選択)"; chipTrack.className="pill off"; }catch(e){}
+  setStatus(msg || "ALBUM RESET");
+}
+
 function parseLRC(text){
   // Robust LRC parser:
   // - strips UTF-8 BOM
@@ -431,10 +462,7 @@ function renderLyrics(){
   if (!currentLines.length){
     panelLyrics.innerHTML = '<div class="lyLine"><div class="en" style="opacity:.75">歌詞がありません。LYRICSを選ぶ で .lrc/.txt を読み込むか、下のLYRICSから選択してください。</div></div>';
     setCur("","");
-renderWordChips("");
-  try{ if (typeof chipLyric!=="undefined" && chipLyric){ chipLyric.textContent="LYRICS: (未選択)"; chipLyric.className="pill off"; } }catch(e){}
-  // clear lyrics picker so selecting same files again triggers change
-  try{ inLyrics.value = ""; }catch(e){}
+    renderWordChips("");
     return;
   }
   for (let i=0;i<currentLines.length;i++){
@@ -499,7 +527,7 @@ function stopSync(){
 
 function selectTrack(i){
   // If lyrics are not loaded for this album, never keep old lyrics visible
-  if (!lyricsLoaded){ try{ clearLyrics(); }catch(e){} }
+  if (!lyricsLoaded){ try{ clearLyricsHard(); }catch(e){} }
   if (!(i>=0 && i<tracks.length)) return;
   trackIndex = i;
   const tr = tracks[i];
@@ -547,8 +575,11 @@ function autoPickLyrics(trackName){
 }
 
 function loadLyricsKey(key){
+  const tok = albumSessionToken;
   const info = lyricsMap.get(key);
   if (!info) return;
+  if (tok !== albumSessionToken) return;
+  lyricsLoaded = true;
 
   currentLines = info.lines;
   currentLineIndex = -1;
@@ -653,6 +684,7 @@ function maybeTranslateLine(i){
 inAudio.addEventListener("change", ()=>{
   const tok = albumSessionToken;
 try{
+    albumReset("ALBUM RESET (AUDIO)");
     // Album overwrite or re-pick: clear old state first
     try{ if (typeof resetAlbumSession === "function") resetAlbumSession("ALBUM RESET (AUDIO)"); }catch(e){}
     clearTracks();
@@ -703,15 +735,21 @@ try{
     // allow re-selecting the same files next time
     try{ inAudio.value = ""; }catch(e){}
   }
-});inLyrics.addEventListener("change", ()=>{
+});
+
+inLyrics.addEventListener("change", ()=>{
   const tok = albumSessionToken;
+  abortLyricReaders();
+  clearLyricsHard();
 const files = Array.from(inLyrics.files || []);
   if (!files.length){ inLyrics.value=""; return; }
   let left = files.length;
   setStatus("LYRICS LOADING...");
   files.forEach(f=>{
     const reader = new FileReader();
+    lyricReaders.push(reader);
     reader.onload = ()=>{
+      if (tok !== albumSessionToken) return;
       try{
         const text = String(reader.result||"");
         const key = normalizeKey(f.name);
@@ -719,14 +757,17 @@ const files = Array.from(inLyrics.files || []);
       }catch(e){}
       left--;
       if (left<=0){
+        lyricsLoaded = true;
         setStatus("LYRICS READY: " + lyricsMap.size);
         renderLyricList();
         if (trackIndex>=0 && tracks[trackIndex]) autoPickLyrics(tracks[trackIndex].name);
       }
     };
     reader.onerror = ()=>{
+      if (tok !== albumSessionToken) return;
       left--;
       if (left<=0){
+        lyricsLoaded = true;
         setStatus("LYRICS READY: " + lyricsMap.size);
         renderLyricList();
       }
@@ -869,7 +910,7 @@ window.addEventListener("unhandledrejection", (ev)=>{
 });
 
 // init
-setStatus("JS OK (deepl2e / album lyrics isolation)");
+setStatus("JS OK (deepl2f / album lyric reset hard)");
 setCur("","");
 renderWordChips("");
 renderTrackList();
