@@ -1,89 +1,19 @@
-// LyricsPocket PWA service worker (robust, avoid white-screen)
-const CACHE = "lyricspocket-pwa-rebuild-swfix-v1";
-const SHELL = [
-  "./",
-  "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./manifest.webmanifest",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-];
-
-self.addEventListener("install", (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).catch(() => {})
-  );
-});
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil((async () => {
-    // delete old caches
-    const keys = await caches.keys();
-    await Promise.all(keys.map((k) => (k === CACHE ? null : caches.delete(k))));
-    await self.clients.claim();
-  })());
-});
-
-// Optional: allow page to force activate the new SW
-self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") self.skipWaiting();
-});
-
-function isAppShellRequest(req) {
-  const url = new URL(req.url);
-  const p = url.pathname;
-  return (
-    p.endsWith("/index.html") ||
-    p.endsWith("/styles.css") ||
-    p.endsWith("/app.js") ||
-    p.endsWith("/manifest.webmanifest") ||
-    p.endsWith("/sw.js") ||
-    p.includes("/icons/")
-  );
-}
-
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
-
-  const url = new URL(req.url);
-
-  // Navigation: try network first, fallback to cached index.html
-  if (req.mode === "navigate") {
-    event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req);
-        const cache = await caches.open(CACHE);
-        cache.put("./index.html", fresh.clone()).catch(() => {});
-        return fresh;
-      } catch (_) {
-        const cached = await caches.match("./index.html");
-        return cached || Response.error();
-      }
-    })());
+const CACHE="lyricspocket-deployroot-v1";
+const SHELL=["./","./index.html","./styles.css","./app.js","./manifest.webmanifest","./icons/icon-192.png","./icons/icon-512.png"];
+self.addEventListener("install",(e)=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).catch(()=>{}));});
+self.addEventListener("activate",(e)=>{e.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.map(k=>k===CACHE?null:caches.delete(k)));await self.clients.claim();})());});
+self.addEventListener("fetch",(e)=>{
+  const r=e.request;
+  if(r.method!=="GET") return;
+  const u=new URL(r.url);
+  if(r.mode==="navigate"){
+    e.respondWith((async()=>{try{return await fetch(r);}catch(_){return (await caches.match("./index.html"))||Response.error();}})());
     return;
   }
-
-  // App shell assets: network-first for app.js to avoid stale-broken cache
-  if (isAppShellRequest(req)) {
-    event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req, { cache: "no-store" });
-        const cache = await caches.open(CACHE);
-        cache.put(req, fresh.clone()).catch(() => {});
-        return fresh;
-      } catch (_) {
-        const cached = await caches.match(req);
-        return cached || fetch(req);
-      }
-    })());
+  // app.js network-first to avoid stale broken cache
+  if(u.pathname.endsWith("/app.js")){
+    e.respondWith((async()=>{try{const f=await fetch(r,{cache:"no-store"});(await caches.open(CACHE)).put(r,f.clone()).catch(()=>{});return f;}catch(_){return (await caches.match(r))||fetch(r);}})());
     return;
   }
-
-  // Other assets: cache-first
-  event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req))
-  );
+  e.respondWith(caches.match(r).then(c=>c||fetch(r)));
 });

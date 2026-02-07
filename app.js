@@ -586,54 +586,30 @@ setStatus(`${tracks.length} FILES LOADED | LYRICS UPDATED`);
 
 // ---------- Folder import (progressive enhancement) ----------
 async function importFromFolder() {
-  setStatus("OPEN FOLDER...");
-  // Preferred: File System Access API (some Android Chromes)
-  if ("showDirectoryPicker" in window) {
-    try {
-      const dir = await window.showDirectoryPicker();
-      const audioCollected = [];
-      const lyricCollected = [];
-
-      for await (const entry of dir.values()) {
-        if (entry.kind !== "file") continue;
-        const file = await entry.getFile();
-        const e = ext(file.name);
-        if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || (file.type && file.type.startsWith("audio/"))) audioCollected.push(file);
-        if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
-      }
-
-      if (!audioCollected.length && !lyricCollected.length) {
-        setStatus("FOLDER EMPTY OR NOT SUPPORTED");
-        return;
-      }
-
-      importAudioFiles(audioCollected);
-      await importLyricsFiles(lyricCollected);
-
-      setStatus(`${tracks.length} FILES LOADED | ${lyricsFiles.length} LYRICS`);
-      // Auto-select lyrics for current track if any
-      if (currentIndex >= 0) {
-        const t = tracks[currentIndex];
-        const doc = trackLyrics.get(t.id);
-        if (!doc) ensureLyricsForTrack(t).then(d=>{ if(d && currentIndex>=0 && tracks[currentIndex].id===t.id) renderLyrics(d); });
-      }
-      return;
-    } catch (e) {
-      // user cancelled or not permitted -> fall through
-    }
-  }
-
-  // Fallback: <input webkitdirectory> (Android Chrome often supports)
-  if (folderInput) {
-    folderInput.value = "";
-    folderInput.click();
+  // showDirectoryPicker is part of File System Access API; not supported on iOS Safari/PWA
+  if (!("showDirectoryPicker" in window)) {
+    alert("このブラウザはフォルダ選択に未対応です。FILESで複数ファイルを選択してください。");
     return;
   }
+  try {
+    const dir = await window.showDirectoryPicker();
+    const audioCollected = [];
+    const lyricCollected = [];
 
-  alert("この環境ではフォルダ選択が利用できません。FILES / LYRICS を使ってください。");
-  setStatus("FOLDER NOT SUPPORTED");
+    for await (const entry of dir.values()) {
+      if (entry.kind !== "file") continue;
+      const file = await entry.getFile();
+      const e = ext(file.name);
+      if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || file.type.startsWith("audio/")) audioCollected.push(file);
+      if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
+    }
+
+    importAudioFiles(audioCollected);
+    await importLyricsFiles(lyricCollected);
+  } catch (e) {
+    // user cancelled
+  }
 }
-
 
 // ---------- Playback ----------
 function selectTrack(index) {
@@ -664,7 +640,6 @@ function selectTrack(index) {
 }
 
 btnPlay.addEventListener("click", async () => {
-  ensureMediaSession();
   if (!tracks.length) return;
   if (currentIndex === -1) selectTrack(0);
   if (audio.paused) await audio.play();
@@ -673,16 +648,16 @@ btnPlay.addEventListener("click", async () => {
 });
 
 btnPrev.addEventListener("click", () => {
-  goPrev(true);
-});
+  if (!tracks.length) return;
+  const ni = Math.max(0, currentIndex - 1);
   selectTrack(ni);
   audio.play().catch(()=>{});
   updatePlayButton();
 });
 
 btnNext.addEventListener("click", () => {
-  goNext(true);
-});
+  if (!tracks.length) return;
+  const ni = Math.min(tracks.length - 1, currentIndex + 1);
   selectTrack(ni);
   audio.play().catch(()=>{});
   updatePlayButton();
@@ -690,29 +665,7 @@ btnNext.addEventListener("click", () => {
 
 btnFiles.addEventListener("click", () => inputAudio.click());
 btnLyrics.addEventListener("click", () => inputLyrics.click());
-btnFolder.addEventListener("click", () => {
-  importFromFolder();
-});
-
-if (folderInput) {
-  folderInput.addEventListener("change", async () => {
-    const files = Array.from(folderInput.files || []);
-    if (!files.length) {
-      setStatus("NO FOLDER SELECTED");
-      return;
-    }
-    const audio = [];
-    const lyric = [];
-    for (const f of files) {
-      const e = ext(f.name);
-      if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || (f.type && f.type.startsWith("audio/"))) audio.push(f);
-      if (["lrc","txt"].includes(e) || f.type === "text/plain") lyric.push(f);
-    }
-    importAudioFiles(audio);
-    await importLyricsFiles(lyric);
-    setStatus(`${tracks.length} FILES LOADED | ${lyricsFiles.length} LYRICS`);
-  });
-}
+btnFolder.addEventListener("click", () => importFromFolder());
 
 btnList.addEventListener("click", () => {
   if (!tracks.length) return;
@@ -790,47 +743,21 @@ btnOnlineTranslate.addEventListener("click", () => {
 });
 
 
-// ---------- Next/Prev + Media Session (Android lockscreen / headset) ----------
-function goNext(play=true){
-  if (!tracks.length) return;
-  const ni = Math.min(tracks.length - 1, currentIndex + 1);
-  selectTrack(ni);
-  if (play) audio.play().catch(()=>{});
-  updatePlayButton();
-}
-function goPrev(play=true){
-  if (!tracks.length) return;
-  const pi = Math.max(0, currentIndex - 1);
-  selectTrack(pi);
-  if (play) audio.play().catch(()=>{});
-  updatePlayButton();
-}
 
-function ensureMediaSession(){
-  if (!("mediaSession" in navigator)) return;
+// ---------- Service Worker (safe) ----------
+(function(){
   try{
-    navigator.mediaSession.setActionHandler("play", async () => { try{ await audio.play(); }catch(_){} updatePlayButton(); });
-    navigator.mediaSession.setActionHandler("pause", () => { audio.pause(); updatePlayButton(); });
-    navigator.mediaSession.setActionHandler("nexttrack", () => goNext(true));
-    navigator.mediaSession.setActionHandler("previoustrack", () => goPrev(true));
+    const params = new URLSearchParams(location.search);
+    if (params.get("nosw") === "1") return;
+    if (!("serviceWorker" in navigator)) return;
+
+    window.addEventListener("load", async () => {
+      try{
+        const reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+        try{ await reg.update(); }catch(_){}
+      }catch(e){
+        // do nothing; app still works without SW
+      }
+    });
   }catch(_){}
-}
-
-function updateMediaSessionMeta(track){
-  if (!track) return;
-  if (!("mediaSession" in navigator)) return;
-  ensureMediaSession();
-  try{
-    navigator.mediaSession.metadata = new MediaMetadata({ title: track.name || "Track", artist: "", album: "LyricsPocket" });
-  }catch(_){}
-}
-
-// ---------- Service Worker ----------
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  });
-}
-
-// Initial
-updatePlayButton();
+})();
