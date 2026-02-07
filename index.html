@@ -69,39 +69,10 @@ audio{width:100%}
 label.btn{gap:8px}
 </style>
 
-<script>
-/* silent cleanup: if an old SW is controlling this page, try to unregister and clear caches once */
-(async function(){
-  try{
-    if (!("serviceWorker" in navigator)) return;
-    if (!navigator.serviceWorker.controller) return;
-    if (sessionStorage.getItem("lp_clean_once")) return;
-    sessionStorage.setItem("lp_clean_once","1");
-
-    try{
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
-    }catch(e){}
-
-    try{
-      if (window.caches){
-        const keys = await caches.keys();
-        await Promise.all(keys.map(k => caches.delete(k).catch(()=>{})));
-      }
-    }catch(e){}
-
-    // reload with cache-bust
-    const u = new URL(location.href);
-    u.searchParams.set("clean", String(Date.now()));
-    location.replace(u.toString());
-  }catch(e){}
-})();
-</script>
-
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket (STABLE v1.3 CLEAN3)</div>
+  <div class="h1">LyricsPocket (STABLE v1.3 CLEAN4)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
 <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（環境によって失敗する場合があります）。</div>
 
@@ -711,7 +682,7 @@ audioEl.addEventListener("pause", stopSync);
 audioEl.addEventListener("ended", stopSync);
 
 // initial UI
-setStatus("JS OK (STABLE v1.3 CLEAN3)");
+setStatus("JS OK (STABLE v1.3 CLEAN4)");
 setAudState();
 renderTrackList();
 renderLyricList();
