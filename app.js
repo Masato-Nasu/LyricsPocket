@@ -12,12 +12,12 @@ const lyricsList = $("lyricsList");
 const srcLine = $("srcLine");
 const jpLine = $("jpLine");
 
-const btnFolder = $("btnFolder") || $("lblFolder");
-const btnFiles = $("btnFiles") || $("lblFiles");
+const btnFolder = $("btnFolder") || $("lblFolder"); // legacy
+const btnFiles = $("btnFiles") || $("lblFiles"); // legacy
 const btnPlay = $("btnPlay");
 const btnPrev = $("btnPrev");
 const btnNext = $("btnNext");
-const btnLyrics = $("btnLyrics") || $("lblLyrics");
+const btnLyrics = $("btnLyrics") || $("lblLyrics"); // legacy
 const btnList = $("btnList");
 
 const inputAudio = $("inputAudio");

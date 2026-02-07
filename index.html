@@ -15,7 +15,26 @@
 .fileLabel{position:relative; display:inline-flex; align-items:center; justify-content:center;}
 .fileLabel input[type=file]{position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer;}
 </style>
+
+<style>
+/* Most compatible: the input itself is the clickable element */
+input.fileBtn{
+  appearance:none;
+  -webkit-appearance:none;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);
+  color:rgba(255,255,255,.92);
+  font:inherit;
+  padding:10px 14px;
+  border-radius:12px;
+  cursor:pointer;
+  user-select:none;
+}
+input.fileBtn:hover{ background:rgba(255,255,255,.09); }
+input.fileBtn:active{ transform:translateY(1px); }
+</style>
 </head>
+
 
 <body>
   <main id="app" class="app">
@@ -41,14 +60,12 @@
     </section>
 
     <footer class="controls">
-      <label id="lblFolder" class="btn fileLabel">FOLDER<input id="inputDir" type="file" webkitdirectory multiple /></label>
-      <label id="lblFiles" class="btn fileLabel">FILES
-</label>
+      <input id="inputDir" class="fileBtn" type="file" webkitdirectory multiple value="FOLDER" />
+      <input id="inputAudio" class="fileBtn" type="file" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,audio/*" multiple value="FILES" />
       <button id="btnPlay" class="btn">PLAY</button>
       <button id="btnPrev" class="btn">PREV</button>
       <button id="btnNext" class="btn">NEXT</button>
-      <label id="lblLyrics" class="btn fileLabel">LYRICS
-</label>
+      <input id="inputLyrics" class="fileBtn" type="file" accept=".lrc,.txt,text/plain" multiple value="LYRICS" />
       <button id="btnList" class="btn">LIST</button>
     </footer>
 <dialog id="dlgList" class="dlg">
