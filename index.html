@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- SWRescue v3: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- SWRescue v4 DIAG: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -135,7 +135,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">SWRescue v3</span>
+      <span class="chip" style="opacity:.7">SWRescue v4 DIAG</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -143,6 +143,7 @@ a{color:rgba(160,220,255,.95)}
   </div>
 
   <div id="status" class="status">READY</div>
+<div id="diag" class="status" style="margin-top:10px; white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">DIAG</div>
 
   <div class="pane">
     <div class="head">IMPORT</div>
@@ -151,6 +152,10 @@ a{color:rgba(160,220,255,.95)}
         <input id="inFolder" type="file" webkitdirectory multiple />
         <input id="inAudio" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg" multiple />
         <input id="inLyrics" type="file" accept=".lrc,.txt,text/plain" multiple />
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnPickAudio" class="btn secondary" type="button">OPEN FILES (AUDIO)</button>
+        <button id="btnPickLyrics" class="btn secondary" type="button">OPEN FILES (LYRICS)</button>
       </div>
       <div class="small" style="margin-top:8px">
         iPhone(iOS)ではフォルダ選択が非対応のため、FILES/LYRICSで複数選択してください。<br>
@@ -219,6 +224,9 @@ a{color:rgba(160,220,255,.95)}
   const $ = (id) => document.getElementById(id);
 
   const status = $("status");
+  const diag = $("diag");
+  const btnPickAudio = $("btnPickAudio");
+  const btnPickLyrics = $("btnPickLyrics");
   const btnOnline = $("btnOnline");
   const btnList = $("btnList");
   const btnPlay = $("btnPlay");
@@ -256,6 +264,27 @@ const trackList = $("trackList");
   let linkMap = loadLinkMap();
 
   function setStatus(t){ status.textContent = t; }
+  function setDiag(t){ if(diag) diag.textContent = String(t); }
+  function diagSnapshot(tag){
+    try{
+      const ua = navigator.userAgent;
+      const standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ? "standalone" : "browser";
+      const swc = (navigator.serviceWorker && navigator.serviceWorker.controller) ? "YES" : "NO";
+      const tnames = tracks.slice(0,12).map(t=>t.name.split("/").pop()).join("\n");
+      const lkeys = Array.from(lyricsByBase.keys()).slice(0,12).join("\n");
+      setDiag(
+        `DIAG @${tag}\n`+
+        `mode: ${standalone}\n`+
+        `SW controller: ${swc}\n`+
+        `tracks: ${tracks.length} (idx=${trackIndex})\n`+
+        `lyrics files: ${lyricsByBase.size}\n`+
+        `--- tracks(head) ---\n${tnames || "(none)"}\n`+
+        `--- lyrics keys(head) ---\n${lkeys || "(none)"}\n`+
+        `UA: ${ua}`
+      );
+    }catch(e){ setDiag("DIAG ERROR: "+String(e)); }
+  }
+
 
   function escapeHTML(s){
     return String(s).replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c]));
@@ -440,6 +469,7 @@ const trackList = $("trackList");
     currentLineIndex = -1;
     renderList();
     setStatus(`LYRICS LOADED: ${lyricLines.length} lines`);
+    diagSnapshot("LYRICS_LOADED");
     if (lyricLines.length && lyricLines[0].t == null){
       highlight(0);
       if (onlineJP) translateLine(0);
@@ -460,6 +490,7 @@ const trackList = $("trackList");
         lyricsByBase.set(b, txt);
         rebuildLyricSelect(b);
         setStatus(`LYRICS READY: ${lyricsByBase.size} files`);
+        diagSnapshot("LYRICS_READY");
         if (trackIndex>=0) pickLyricsForTrack(tracks[trackIndex].name);
       };
       reader.readAsText(f);
@@ -531,6 +562,7 @@ const trackList = $("trackList");
     trackIndex = 0;
     rebuildTrackList();
     setStatus(`FILES LOADED: ${tracks.length} (tap a track below)`);
+    diagSnapshot("FILES_LOADED");
     selectTrack(0, false);
   }
 
@@ -547,6 +579,7 @@ const trackList = $("trackList");
     currentLineIndex = -1;
     pickLyricsForTrack(tr.name);
     setStatus(`TRACK: ${tr.name.split("/").pop()}`);
+    diagSnapshot("TRACK:SET");
     if (autoPlay) safePlay();
   }
 
@@ -666,7 +699,11 @@ const trackList = $("trackList");
     btnList.textContent = "LIST: " + (listOn ? "ON" : "OFF");
   });
 
-  inFolder.addEventListener("change", () => {
+  
+  btnPickAudio && btnPickAudio.addEventListener("click", ()=>{ try{ inAudio.click(); }catch(e){} });
+  btnPickLyrics && btnPickLyrics.addEventListener("click", ()=>{ try{ inLyrics.click(); }catch(e){} });
+
+inFolder.addEventListener("change", () => {
     const files = Array.from(inFolder.files || []);
     importAudioFiles(files);
     importLyricsFiles(files);
@@ -687,6 +724,7 @@ const trackList = $("trackList");
     if (!Number.isFinite(i)) return;
     selectTrack(i, false);
     setStatus("TRACK SELECTED: " + (tracks[i]?.name.split("/").pop() || ""));
+    diagSnapshot("TRACK_SELECTED");
   });
 
   trackList.addEventListener("pointerup", (e) => {
@@ -774,10 +812,10 @@ selLyric.addEventListener("change", () => {
   listEl.style.display = "block";
 
   // JS OK marker
-  setStatus("JS OK (SWRescue v3)");
+  setStatus("JS OK (SWRescue v4 DIAG)");
   try{ const c = (navigator.serviceWorker && navigator.serviceWorker.controller) ? "YES" : "NO"; setStatus("SW controller: " + c);
   try{ setStatus(`TRACKS: ${tracks.length} / LYRICS: ${lyricsByBase.size}`); }catch(_){ } }catch(_){ }
-  setStatus("READY (SWRescue v3)");
+  setStatus("READY (SWRescue v4 DIAG)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>
