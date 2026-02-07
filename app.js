@@ -12,7 +12,7 @@ const lyricsList = $("lyricsList");
 const srcLine = $("srcLine");
 const jpLine = $("jpLine");
 
-const btnFolder = $("btnFolder");
+const btnFolder = $("btnFolder") || $("lblFolder");
 const btnFiles = $("btnFiles") || $("lblFiles");
 const btnPlay = $("btnPlay");
 const btnPrev = $("btnPrev");
@@ -21,6 +21,7 @@ const btnLyrics = $("btnLyrics") || $("lblLyrics");
 const btnList = $("btnList");
 
 const inputAudio = $("inputAudio");
+const inputDir = $("inputDir");
 const inputLyrics = $("inputLyrics");
 
 const dlgList = $("dlgList");
@@ -635,7 +636,6 @@ btnNext.addEventListener("click", () => {
 
 });
 });
-btnFolder.addEventListener("click", () => importFromFolder());
 
 btnList.addEventListener("click", () => {
   if (!tracks.length) return;
@@ -655,6 +655,17 @@ inputLyrics.addEventListener("change", async () => {
   await importLyricsFiles(files);
   inputLyrics.value = "";
 });
+
+// Folder import (Chromium / Android). iOS PWA does not support folder picking.
+if (inputDir) {
+  inputDir.addEventListener("change", async () => {
+    const files = Array.from(inputDir.files || []);
+    // split into audio + lyrics by extension
+    importAudioFiles(files);
+    await importLyricsFiles(files);
+    inputDir.value = "";
+  });
+}
 
 // LRC sync
 audio.addEventListener("timeupdate", () => {
