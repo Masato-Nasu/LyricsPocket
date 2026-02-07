@@ -590,29 +590,45 @@ setStatus(`${tracks.length} FILES LOADED | LYRICS UPDATED`);
 
 // ---------- Folder import (progressive enhancement) ----------
 async function importFromFolder() {
-  // showDirectoryPicker is part of File System Access API; not supported on iOS Safari/PWA
-  if (!("showDirectoryPicker" in window)) {
-    alert("このブラウザはフォルダ選択に未対応です。FILESで複数ファイルを選択してください。");
+  setStatus("OPEN FOLDER...");
+  // Preferred: File System Access API (some Android Chromes)
+  if ("showDirectoryPicker" in window) {
+    try {
+      const dir = await window.showDirectoryPicker();
+      const audioCollected = [];
+      const lyricCollected = [];
+
+      for await (const entry of dir.values()) {
+        if (entry.kind !== "file") continue;
+        const file = await entry.getFile();
+        const e = ext(file.name);
+        if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || (file.type && file.type.startsWith("audio/"))) audioCollected.push(file);
+        if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
+      }
+
+      if (!audioCollected.length && !lyricCollected.length) {
+        setStatus("FOLDER EMPTY OR NOT SUPPORTED");
+        return;
+      }
+
+      importAudioFiles(audioCollected);
+      await importLyricsFiles(lyricCollected);
+      setStatus(`${tracks.length} FILES LOADED | ${lyricsFiles.length} LYRICS`);
+      return;
+    } catch (e) {
+      // user cancelled or not permitted -> fall through to input fallback
+    }
+  }
+
+  // Fallback: <input webkitdirectory>
+  if (!folderInput) {
+    alert("この環境ではフォルダ選択が利用できません。FILES / LYRICS を使ってください。");
+    setStatus("FOLDER NOT SUPPORTED");
     return;
   }
-  try {
-    const dir = await window.showDirectoryPicker();
-    const audioCollected = [];
-    const lyricCollected = [];
 
-    for await (const entry of dir.values()) {
-      if (entry.kind !== "file") continue;
-      const file = await entry.getFile();
-      const e = ext(file.name);
-      if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || file.type.startsWith("audio/")) audioCollected.push(file);
-      if (["txt","lrc"].includes(e) || file.type === "text/plain") lyricCollected.push(file);
-    }
-
-    importAudioFiles(audioCollected);
-    await importLyricsFiles(lyricCollected);
-  } catch (e) {
-    // user cancelled
-  }
+  folderInput.value = "";
+  folderInput.click();
 }
 
 // ---------- Playback ----------
@@ -667,6 +683,26 @@ btnNext.addEventListener("click", () => {
 btnFiles.addEventListener("click", () => inputAudio.click());
 btnLyrics.addEventListener("click", () => inputLyrics.click());
 btnFolder.addEventListener("click", () => importFromFolder());
+
+if (folderInput) {
+  folderInput.addEventListener("change", async (ev) => {
+    const files = Array.from(folderInput.files || []);
+    if (!files.length) {
+      setStatus("NO FOLDER SELECTED");
+      return;
+    }
+    const audio = [];
+    const lyric = [];
+    for (const f of files) {
+      const e = ext(f.name);
+      if (["mp3","m4a","aac","wav","flac","ogg"].includes(e) || (f.type && f.type.startsWith("audio/"))) audio.push(f);
+      if (["lrc","txt"].includes(e) || f.type === "text/plain") lyric.push(f);
+    }
+    importAudioFiles(audio);
+    await importLyricsFiles(lyric);
+    setStatus(`${tracks.length} FILES LOADED | ${lyricsFiles.length} LYRICS`);
+  });
+}
 
 btnList.addEventListener("click", () => {
   if (!tracks.length) return;
