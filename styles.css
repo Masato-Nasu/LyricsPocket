@@ -181,21 +181,21 @@ body{
 }
 
 
-/* Line item with JP under EN */
+/* EN line + JP line (under) */
 .lineItem{
   display:flex;
   flex-direction:column;
   gap:6px;
+  padding:6px 0;
 }
-.jp{
+.line.en{
+  cursor:pointer;
+}
+.jpUnder{
   font-size:13px;
   line-height:1.35;
-  color:rgba(255,255,255,.45);
+  color:rgba(255,255,255,.42);
 }
-.lineItem.current .line.en{
-  color:rgba(255,255,255,1);
-  font-weight:650;
-}
-.lineItem.current .jp{
+.lineItem.current .jpUnder{
   color:rgba(255,255,255,.72);
 }

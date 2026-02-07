@@ -36,8 +36,6 @@ let translationCache = new Map(); // key: text -> jp
 let tracks = []; // {id, file, name, title, normBase}
 let lyricsFiles = []; // {file, name, normBase, kind}
 let trackLyrics = new Map(); // trackId -> {kind, lines[]}
-let trackLyricsSource = new Map(); // trackId -> lyrics file name
-
 let currentIndex = -1;
 
 const audio = new Audio();
@@ -47,30 +45,75 @@ audio.playsInline = true;
 // ---------- Utils ----------
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
-function cacheGet(key){
-  if (translationCache.has(key)) return translationCache.get(key);
+function cacheKey(text){ return "lpjp:" + text; }
+
+function cacheGet(text){
+  if (translationCache.has(text)) return translationCache.get(text);
   try{
-    const v = localStorage.getItem("lpjp:" + key);
-    if (v) {
-      translationCache.set(key, v);
-      return v;
-    }
+    const v = localStorage.getItem(cacheKey(text));
+    if (v) { translationCache.set(text, v); return v; }
   }catch(_){}
   return null;
 }
-function cacheSet(key, val){
-  translationCache.set(key, val);
-  try{
-    localStorage.setItem("lpjp:" + key, val);
-  }catch(_){}
+function cacheSet(text, jp){
+  translationCache.set(text, jp);
+  try{ localStorage.setItem(cacheKey(text), jp); }catch(_){}
+}
+
+// JP translate queue (avoid rate limits)
+const JP_QUEUE = [];
+let jpQueueRunning = false;
+let jpQueueToken = 0;
+
+function queueJP(text, lineId, priority=false){
+  const t = (text || "").trim();
+  if (!t) return;
+  const cached = cacheGet(t);
+  if (cached) {
+    setJPUnder(lineId, cached);
+    return;
+  }
+  // avoid duplicates
+  if (JP_QUEUE.some(it => it.t === t && it.lineId === lineId)) return;
+  if (priority) JP_QUEUE.unshift({t, lineId});
+  else JP_QUEUE.push({t, lineId});
+  runJPQueue();
+}
+
+async function runJPQueue(){
+  if (jpQueueRunning) return;
+  jpQueueRunning = true;
+  const token = ++jpQueueToken;
+
+  while (JP_QUEUE.length) {
+    if (token !== jpQueueToken) break;
+    const {t, lineId} = JP_QUEUE.shift();
+    // Skip if already filled meanwhile
+    const node = lyricsList.querySelector(`.lineItem[data-id="${lineId}"] .jpUnder`);
+    if (node && node.textContent && node.textContent.trim().length) continue;
+
+    const jp = await translateLineToJP(t);
+    if (token !== jpQueueToken) break;
+    if (jp) {
+      cacheSet(t, jp);
+      setJPUnder(lineId, jp);
+      // If current, also update bottom panel
+      if (Number(lineId) === currentLineId) {
+        jpLine.textContent = jp;
+      }
+      await sleep(220); // mild throttle
+    } else {
+      // On failure, leave empty but do not spam
+      await sleep(380);
+    }
+  }
+  jpQueueRunning = false;
 }
 
 function normalizeBase(name) {
   let x = name.toLowerCase();
   // strip extension if exists
   x = x.replace(/\.[a-z0-9]+$/i, "");
-  // strip leading track numbers like "01 - "
-  x = x.replace(/^\s*\d{1,3}\s*[-_.]*\s*/g, "");
   // remove (...) and [...]
   x = x.replace(/\(.*?\)/g, " ").replace(/\[.*?\]/g, " ");
   // remove non-alnum -> spaces
@@ -146,19 +189,6 @@ async function readTextFile(file) {
 }
 
 // ---------- Auto link lyrics ----------
-function ensureLyricsForTrack(track){
-  if (!track) return null;
-  if (trackLyrics.has(track.id)) return null;
-
-  const strict = tryAutoLink(track);
-  if (strict) return strict;
-
-  const candidates = lyricsFiles.filter(l => l.normBase && track.normBase && (l.normBase.includes(track.normBase) || track.normBase.includes(l.normBase)));
-  if (!candidates.length) return null;
-  candidates.sort((a,b)=> (a.kind==="lrc"?-1:1) - (b.kind==="lrc"?-1:1));
-  return candidates[0] || null;
-}
-
 async function loadLyricsFile(file) {
   const name = file.name;
   const kind = ext(name) === "lrc" ? "lrc" : "txt";
@@ -178,57 +208,13 @@ function tryAutoLink(track) {
   return best;
 }
 
-function getPersistedLyricsName(track){
-  try{
-    return localStorage.getItem("lplink:" + track.normBase) || "";
-  }catch(_){
-    return "";
-  }
-}
-
-function persistLyricsLink(track, lyricName){
-  try{
-    localStorage.setItem("lplink:" + track.normBase, lyricName);
-  }catch(_){}
-}
-
-function findBestLyricsFileForTrack(track){
-  // 1) strict by normalized base
-  const strict = tryAutoLink(track);
-  if (strict) return strict;
-
-  // 2) persisted (by filename)
-  const persisted = getPersistedLyricsName(track);
-  if (persisted) {
-    const byName = lyricsFiles.find(l => l.name === persisted);
-    if (byName) return byName;
-  }
-
-  // 3) fuzzy includes
-  const cand = lyricsFiles.filter(l => l.normBase && track.normBase && (l.normBase.includes(track.normBase) || track.normBase.includes(l.normBase)));
-  if (!cand.length) return null;
-  cand.sort((a,b)=> (a.kind==="lrc"?-1:1) - (b.kind==="lrc"?-1:1));
-  return cand[0] || null;
-}
-
-async function linkLyricsToTrack(track, lyric){
-  if (!track || !lyric || !lyric.file) return null;
-  try{
-    const text = await readTextFile(lyric.file);
-    const doc = (lyric.kind === "lrc") ? parseLRC(text) : parseTXT(text);
-    trackLyrics.set(track.id, doc);
-    trackLyricsSource.set(track.id, lyric.name);
-    persistLyricsLink(track, lyric.name);
-    return doc;
-  }catch(_){
-    return null;
-  }
-}
-
-
 // ---------- Rendering ----------
 function renderLyrics(doc) {
   lyricsList.innerHTML = "";
+  currentLineId = -1;
+  jpQueueToken++; // cancel queue from previous song
+  JP_QUEUE.length = 0;
+
   if (!doc || !doc.lines?.length) {
     lyricsEmpty.style.display = "flex";
     lyricsList.style.display = "none";
@@ -248,7 +234,7 @@ function renderLyrics(doc) {
     en.addEventListener("click", () => onTapLine(line.text || "", line.id));
 
     const jp = document.createElement("div");
-    jp.className = "jp mono faint";
+    jp.className = "jpUnder mono";
     jp.textContent = "";
 
     item.appendChild(en);
@@ -256,8 +242,10 @@ function renderLyrics(doc) {
     lyricsList.appendChild(item);
   }
 
+  // Prefetch: first 8 lines (lightweight) so it "feels automatic"
   if (onlineTranslate) {
-    startAutoTranslate(doc);
+    const pre = doc.lines.slice(0, 8);
+    for (const l of pre) queueJP(l.text || "", l.id, false);
   }
 }
 
@@ -269,6 +257,8 @@ function highlightCurrent(doc, timeSec) {
     if (line.t <= timeSec) bestId = line.id;
     else break;
   }
+
+  // update current marker & scroll
   const children = lyricsList.children;
   for (let i = 0; i < children.length; i++) {
     const el = children[i];
@@ -283,14 +273,26 @@ function highlightCurrent(doc, timeSec) {
         el.scrollIntoView({ block: "center", behavior: "smooth" });
       }
       const enEl = el.querySelector(".line.en");
-      const jpEl = el.querySelector(".jp");
+      const jpEl = el.querySelector(".jpUnder");
       if (enEl && jpEl) {
         srcLine.textContent = enEl.textContent || "";
         jpLine.textContent = jpEl.textContent || (onlineTranslate ? "TRANSLATING..." : "TAP A LINE TO TRANSLATE");
-        if (onlineTranslate && (!jpEl.textContent || jpEl.textContent.trim().length===0)) {
-          // prioritize current line
-          ensureJPForLine(doc, bestId);
-        }
+      }
+    }
+  }
+
+  // Auto-translate around current line (priority)
+  if (onlineTranslate && bestId !== currentLineId) {
+    currentLineId = bestId;
+    const cur = doc.lines.find(l => l.id === bestId);
+    if (cur) queueJP(cur.text || "", cur.id, true);
+
+    // also queue next 4 lines to make it feel continuous
+    const idx = doc.lines.findIndex(l => l.id === bestId);
+    if (idx >= 0) {
+      for (let k = 1; k <= 4; k++) {
+        const l = doc.lines[idx + k];
+        if (l) queueJP(l.text || "", l.id, false);
       }
     }
   }
@@ -349,8 +351,6 @@ btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
           const text = await readTextFile(l.file);
           const doc = (l.kind === "lrc") ? parseLRC(text) : parseTXT(text);
           trackLyrics.set(t.id, doc);
-      trackLyricsSource.set(t.id, best.name);
-      persistLyricsLink(t, best.name);
           if (currentIndex === i) renderLyrics(doc);
           setStatus(`${tracks.length} FILES LOADED | LYRICS LINKED`);
         }
@@ -369,8 +369,42 @@ btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
   }
 }
 
+// ---------- Per-line JP (Smart) ----------
+let currentLineId = -1;
+
+function setJPUnder(lineId, jpText){
+  const item = lyricsList.querySelector(`.lineItem[data-id="${lineId}"]`);
+  if (!item) return;
+  const jp = item.querySelector(".jpUnder");
+  if (jp) jp.textContent = jpText || "";
+}
+
+async function translateLineToJP(trimmed){
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 8000);
+  try{
+    const url = new URL("https://api.mymemory.translated.net/get");
+    url.searchParams.set("q", trimmed);
+    url.searchParams.set("langpair", "en|ja");
+
+    const res = await fetch(url.toString(), { method: "GET", signal: ctrl.signal, cache: "no-store" });
+    const data = await res.json();
+    const jp = data?.responseData?.translatedText;
+
+    if (!jp || jp.trim().length === 0) return "";
+    // If MyMemory rate-limits, it may echo input. In that case, show nothing but allow OPEN via bottom panel.
+    if (jp.trim().toLowerCase() === trimmed.toLowerCase()) return "";
+    if (/MYMEMORY WARNING/i.test(jp)) return "";
+    return jp;
+  }catch(_){
+    return "";
+  }finally{
+    clearTimeout(timeout);
+  }
+}
+
 // ---------- Translation ----------
-async function translateToJP(text, lineId = null) {
+async function translateToJP(text) {
   const trimmed = (text || "").trim();
   if (!trimmed) return;
 
@@ -387,8 +421,9 @@ async function translateToJP(text, lineId = null) {
     return;
   }
 
-  if (translationCache.has(trimmed)) {
-    jpLine.textContent = translationCache.get(trimmed);
+  const cached0 = cacheGet(trimmed);
+  if (cached0) {
+    jpLine.textContent = cached0;
     return;
   }
 
@@ -411,7 +446,7 @@ async function translateToJP(text, lineId = null) {
     if (jp.trim().toLowerCase() === trimmed.toLowerCase()) throw new Error("ECHO");
     if (/MYMEMORY WARNING/i.test(jp)) throw new Error("WARNING");
 
-    translationCache.set(trimmed, jp);
+    cacheSet(trimmed, jp);
     jpLine.textContent = jp;
   } catch (e) {
     // Fallback: show action buttons (open translate / copy)
@@ -444,12 +479,11 @@ async function translateToJP(text, lineId = null) {
   }
 }
 
-function onTapLine(text, lineId) {
-  translateToJP(text, lineId);
+function onTapLine(text) {
+  translateToJP(text);
 }
 
 // ---------- Import audio ----------
-// AUTO_LINK_AFTER_AUDIO
 function importAudioFiles(files) {
   const audioFiles = files.filter(f => f.type.startsWith("audio/") || ["mp3","m4a","aac","wav","flac","ogg"].includes(ext(f.name)));
   if (!audioFiles.length) return;
@@ -471,17 +505,6 @@ function importAudioFiles(files) {
   setStatus(`${tracks.length} FILES LOADED`);
   renderTrackList();
 
-  // AUTO_LINK_AFTER_AUDIO: if lyrics are already imported, link them now
-  if (lyricsFiles.length) {
-    for (const t of tracks) {
-      if (trackLyrics.has(t.id)) continue;
-      const best = findBestLyricsFileForTrack(t);
-      if (best) {
-        linkLyricsToTrack(t, best);
-      }
-    }
-  }
-
   if (currentIndex === -1 && tracks.length) {
     selectTrack(0);
   }
@@ -494,19 +517,6 @@ async function importLyricsFiles(files) {
   }
 
   // try auto-link for all tracks
-  // AUTO_LINK_AFTER_LYRICS: robust best-match + persist
-  for (const t of tracks) {
-    if (trackLyrics.has(t.id)) continue;
-    const best2 = findBestLyricsFileForTrack(t);
-    if (best2) {
-      const text2 = await readTextFile(best2.file);
-      const doc2 = best2.kind === "lrc" ? parseLRC(text2) : parseTXT(text2);
-      trackLyrics.set(t.id, doc2);
-      trackLyricsSource.set(t.id, best2.name);
-      persistLyricsLink(t, best2.name);
-    }
-  }
-
   for (const t of tracks) {
     if (trackLyrics.has(t.id)) continue;
     const best = tryAutoLink(t);
@@ -514,8 +524,6 @@ async function importLyricsFiles(files) {
       const text = await readTextFile(best.file);
       const doc = best.kind === "lrc" ? parseLRC(text) : parseTXT(text);
       trackLyrics.set(t.id, doc);
-      trackLyricsSource.set(t.id, best.name);
-      persistLyricsLink(t, best.name);
     }
   }
 
@@ -557,7 +565,6 @@ async function importFromFolder() {
 }
 
 // ---------- Playback ----------
-// AUTO_LINK_LYRICS
 function selectTrack(index) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
@@ -569,33 +576,6 @@ function selectTrack(index) {
 
   const doc = trackLyrics.get(t.id);
   renderLyrics(doc || null);
-
-  // AUTO_LINK_LYRICS: when a track is selected/played, show its lyrics automatically
-  if (!doc && lyricsFiles.length) {
-    const bestLyric = findBestLyricsFileForTrack(t);
-    if (bestLyric) {
-      linkLyricsToTrack(t, bestLyric).then(created => {
-        if (created && currentIndex === index) {
-          renderLyrics(created);
-          setStatus(`${tracks.length} FILES LOADED | LYRICS LINKED`);
-        }
-      });
-    }
-  }
-
-  // If not linked yet, try to link automatically (best-effort)
-  if (!doc) {
-    const hint = ensureLyricsForTrack(t);
-    if (hint && hint.file) {
-      readTextFile(hint.file).then(text => {
-        const created = (hint.kind === "lrc") ? parseLRC(text) : parseTXT(text);
-        trackLyrics.set(t.id, created);
-        if (currentIndex === index) renderLyrics(created);
-        setStatus(`${tracks.length} FILES LOADED | LYRICS LINKED`);
-      }).catch(()=>{});
-    }
-  }
-
   srcLine.textContent = "";
   jpLine.textContent = "TAP A LINE TO TRANSLATE";
 }
@@ -700,16 +680,6 @@ btnOnlineTranslate.addEventListener("click", () => {
   btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
   if (!onlineTranslate) {
     jpLine.textContent = "TAP A LINE TO TRANSLATE";
-    autoTranslateToken++; // cancel
-    // clear JP under lines
-    const nodes = lyricsList.querySelectorAll(".jp");
-    nodes.forEach(n=> n.textContent = "");
-  } else {
-    if (currentIndex >= 0) {
-      const t = tracks[currentIndex];
-      const doc = trackLyrics.get(t.id);
-      if (doc) startAutoTranslate(doc);
-    }
   }
 });
 
