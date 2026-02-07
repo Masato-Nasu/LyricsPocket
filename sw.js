@@ -1,22 +1,19 @@
-/* LyricsPocket SAFE SW
-   - no fetch handler (so it won't interfere with media/file access)
-   - activates immediately; clears old caches
+/* LyricsPocket SWFIX (self-destruct)
+   NOTE: The app does NOT register a Service Worker.
+   This file exists only so that if an old/broken SW was registered at ./sw.js,
+   it can update to this version, clear caches, then unregister itself.
 */
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil((async () => {
-    try{
-      const keys = await caches.keys();
-      await Promise.all(keys.map(k => caches.delete(k)));
-    }catch(e){}
-  })());
 });
+
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     try{
-      await self.clients.claim();
       const keys = await caches.keys();
       await Promise.all(keys.map(k => caches.delete(k)));
     }catch(e){}
+    try{ await self.clients.claim(); }catch(e){}
+    try{ await self.registration.unregister(); }catch(e){}
   })());
 });
