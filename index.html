@@ -70,20 +70,38 @@ label.btn{gap:8px}
 </style>
 
 <script>
-/* SW: 古い壊れたSWループから抜けるため、無害SWを上書き登録 */
-(function(){
+/* silent cleanup: if an old SW is controlling this page, try to unregister and clear caches once */
+(async function(){
   try{
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("./sw.js", {scope:"./"}).then(function(reg){
-      try{ reg.update(); }catch(e){}
-    }).catch(function(){});
+    if (!navigator.serviceWorker.controller) return;
+    if (sessionStorage.getItem("lp_clean_once")) return;
+    sessionStorage.setItem("lp_clean_once","1");
+
+    try{
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
+    }catch(e){}
+
+    try{
+      if (window.caches){
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k).catch(()=>{})));
+      }
+    }catch(e){}
+
+    // reload with cache-bust
+    const u = new URL(location.href);
+    u.searchParams.set("clean", String(Date.now()));
+    location.replace(u.toString());
   }catch(e){}
 })();
 </script>
+
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket (STABLE v1.3 SIMPLE)</div>
+  <div class="h1">LyricsPocket (STABLE v1.3 CLEAN)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
 <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（環境によって失敗する場合があります）。</div>
 
@@ -124,10 +142,8 @@ JP:</div>
 
   <div class="pane">
     <div class="head">
-      <div style="font-weight:700">SW / リセット</div>
     </div>
     <div class="body">
-      <a class="btn danger" href="./kill-sw.html">SW & Cache を消す（白画面対策）</a>
       <div class="small" style="margin-top:10px">※ 反映がおかしい／真っ白になる場合は、上のボタン→戻る→再読み込み。</div>
 
     </div>
@@ -655,7 +671,7 @@ audioEl.addEventListener("pause", stopSync);
 audioEl.addEventListener("ended", stopSync);
 
 // initial UI
-setStatus("JS OK (STABLE v1.3 SIMPLE)");
+setStatus("JS OK (STABLE v1.3 CLEAN)");
 renderTrackList();
 renderLyricList();
 
