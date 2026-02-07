@@ -1,7 +1,7 @@
 {
-  "name": "LyricsPocket (proxy-ready)",
+  "name": "LyricsPocket (JP fallback + proxy)",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=fix6h",
+  "start_url": "./index.html?v=fix6j",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
