@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- SWRescue v1: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- SWRescue v2: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -93,6 +93,10 @@ hr{border:none; border-top:1px solid var(--line); margin:12px 0}
 .item.current{background:rgba(255,255,255,.04)}
 .item.showjp .jp{display:block}
 
+.itemBtn{width:100%; text-align:left; border:none; background:transparent; color:inherit; padding:0; margin:0; font:inherit; cursor:pointer;}
+.itemBtn:focus{outline:2px solid rgba(160,220,255,.35); outline-offset:2px}
+
+
 #errPanel{
   position:fixed; left:12px; right:12px; bottom:12px;
   max-height:42vh; overflow:auto;
@@ -133,7 +137,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">SWRescue v1</span>
+      <span class="chip" style="opacity:.7">SWRescue v2</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -158,9 +162,9 @@ a{color:rgba(160,220,255,.95)}
       
       <div class="row">
         <div class="chip" id="curTrackChip" style="flex:1;min-width:260px;opacity:.9">TRACK: (未選択)</div>
-        <button id="btnShowTracks" class="btn secondary" type="button">CHOOSE TRACK</button>
       </div>
-      <div id="trackList" class="list" style="margin-top:10px; display:none; border:1px solid rgba(255,255,255,.14); border-radius:14px"></div>
+      <div class="small" style="margin-top:8px">↓ 曲一覧をタップして選択してください（CHOOSEボタンは廃止しました）</div>
+      <div id="trackList" class="list" style="margin-top:10px; display:block; border:1px solid rgba(255,255,255,.14); border-radius:14px"></div>
 
       <div class="row" style="margin-top:10px">
         <select id="selLyric">
@@ -230,8 +234,7 @@ a{color:rgba(160,220,255,.95)}
   const inLyrics = $("inLyrics");
 
   const curTrackChip = $("curTrackChip");
-  const btnShowTracks = $("btnShowTracks");
-  const trackList = $("trackList");
+const trackList = $("trackList");
   const selLyric = $("selLyric");
   const btnLink = $("btnLink");
   const btnUnlink = $("btnUnlink");
@@ -490,6 +493,22 @@ a{color:rgba(160,220,255,.95)}
     tracks.forEach((t,i)=>{
       const div = document.createElement("div");
       div.className = "item" + (i===trackIndex ? " current":"");
+      // Use <button> for reliable tap on mobile/PWA
+      div.innerHTML = `<button type="button" class="itemBtn"><div class="t">${escapeHTML(t.name.split("/").pop())}</div></button>`;
+      const btn = div.querySelector("button");
+      const pick = ()=>{ selectTrack(i, false); };
+      btn.addEventListener("click", pick);
+      // Extra handlers for edge cases
+      btn.addEventListener("pointerup", pick);
+      btn.addEventListener("touchend", (e)=>{ e.preventDefault(); pick(); }, {passive:false});
+      trackList.appendChild(div);
+    });
+    const label = (trackIndex>=0 && tracks[trackIndex]) ? tracks[trackIndex].name.split("/").pop() : "(未選択)";
+    curTrackChip.textContent = "TRACK: " + label;
+  }
+    tracks.forEach((t,i)=>{
+      const div = document.createElement("div");
+      div.className = "item" + (i===trackIndex ? " current":"");
       div.innerHTML = `<div class="t">${escapeHTML(t.name.split("/").pop())}</div>`;
       div.addEventListener("click", ()=>{
         selectTrack(i, false);
@@ -666,14 +685,7 @@ a{color:rgba(160,220,255,.95)}
     importLyricsFiles(Array.from(inLyrics.files || []));
     inLyrics.value = "";
   });
-
-  btnShowTracks.addEventListener("click", () => {
-    if (!tracks.length){ alert("まずFILESで音声ファイルを読み込んでください。"); return; }
-    trackList.style.display = (trackList.style.display === "none") ? "block" : "none";
-    rebuildTrackList();
-  });
-
-  selLyric.addEventListener("change", () => {
+selLyric.addEventListener("change", () => {
     // just selecting doesn't link yet; LINK button writes mapping
     const v = selLyric.value || "";
     if (v && trackIndex>=0){
@@ -746,9 +758,10 @@ a{color:rgba(160,220,255,.95)}
   listEl.style.display = "block";
 
   // JS OK marker
-  setStatus("JS OK (SWRescue v1)");
-  try{ const c = (navigator.serviceWorker && navigator.serviceWorker.controller) ? "YES" : "NO"; setStatus("SW controller: " + c); }catch(_){ }
-  setStatus("READY (SWRescue v1)");
+  setStatus("JS OK (SWRescue v2)");
+  try{ const c = (navigator.serviceWorker && navigator.serviceWorker.controller) ? "YES" : "NO"; setStatus("SW controller: " + c);
+  try{ setStatus(`TRACKS: ${tracks.length} / LYRICS: ${lyricsByBase.size}`); }catch(_){ } }catch(_){ }
+  setStatus("READY (SWRescue v2)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>

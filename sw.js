@@ -1,4 +1,4 @@
-/* LyricsPocket SWRescue v1
+/* LyricsPocket SWRescue v2
    Intentionally does NOT implement fetch handler (network passthrough).
    Clears Cache Storage to avoid stale assets and takes control immediately.
 */
