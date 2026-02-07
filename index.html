@@ -7,7 +7,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <title>LyricsPocket</title>
 
-<!-- OneFileReset v4: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
+<!-- OneFileReset v4.1: No external JS/CSS (avoids SW/cache issues). Includes SW+Cache reset tools. -->
 <script>
 (async function(){
   try{
@@ -118,7 +118,7 @@ a{color:rgba(160,220,255,.95)}
   <div class="top">
     <div class="title">LyricsPocket</div>
     <div class="chips">
-      <span class="chip" style="opacity:.7">OneFileReset v4</span>
+      <span class="chip" style="opacity:.7">OneFileReset v4.1</span>
       <button id="btnOnline" class="chip on" type="button">ONLINE JP: ON</button>
       <button id="btnList" class="chip" type="button">LIST: ON</button>
       <a class="chip" href="./kill-sw.html" style="text-decoration:none;color:inherit">SW RESET</a>
@@ -657,7 +657,6 @@ a{color:rgba(160,220,255,.95)}
     trackList.style.display = (trackList.style.display === "none") ? "block" : "none";
     rebuildTrackList();
   });
-  });
 
   selLyric.addEventListener("change", () => {
     // just selecting doesn't link yet; LINK button writes mapping
@@ -730,7 +729,10 @@ a{color:rgba(160,220,255,.95)}
 
   // Initial UI
   listEl.style.display = "block";
-  setStatus("READY (OneFileReset v4)");
+
+  // JS OK marker
+  setStatus("JS OK (v4.1)");
+  setStatus("READY (OneFileReset v4.1)");
   btnOnline.classList.toggle("on", onlineJP);
 })();
 </script>
