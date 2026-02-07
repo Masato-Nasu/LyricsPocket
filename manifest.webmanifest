@@ -1,7 +1,7 @@
 {
-  "name": "LyricsPocket (auto-next + share to TANGO-CHO)",
+  "name": "LyricsPocket (proxy-ready)",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=fix6g",
+  "start_url": "./index.html?v=fix6h",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",

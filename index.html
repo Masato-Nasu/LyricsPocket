@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=fix6g">
+<link rel="manifest" href="./manifest.webmanifest?v=fix6h">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -559,6 +559,18 @@ function loadLyricsKey(key){
   }
 }
 
+// Translation endpoint
+// Default: direct MyMemory (may fail due to CORS / quota on some networks)
+// If you deploy a small CORS proxy (Cloudflare Worker), set it here:
+// e.g. const TRANSLATE_PROXY_BASE = "https://YOURNAME.workers.dev/get";
+const MYMEMORY_BASE = "https://api.mymemory.translated.net/get";
+const TRANSLATE_PROXY_BASE = ""; // <-- set your proxy URL to avoid CORS
+
+function buildTranslateURL(q){
+  const base = (TRANSLATE_PROXY_BASE && TRANSLATE_PROXY_BASE.trim()) ? TRANSLATE_PROXY_BASE.trim() : MYMEMORY_BASE;
+  return base + "?q=" + encodeURIComponent(q) + "&langpair=en|ja";
+}
+
 function maybeTranslateLine(i){
   if (!jpOn) return;
   if (!(i>=0 && i<currentLines.length)) return;
@@ -569,7 +581,7 @@ function maybeTranslateLine(i){
   if (!q) return;
 
   setStatus("TRANSLATING...");
-  const url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(q) + "&langpair=en|ja";
+  const url = buildTranslateURL(q);
   fetch(url)
     .then(r=>{ if (!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
     .then(j=>{
@@ -585,11 +597,11 @@ function maybeTranslateLine(i){
       setStatus("OK");
     })
     .catch(()=>{
-      ln.jp = "（翻訳失敗：ネット/CORS/制限の可能性）";
+      ln.jp = (TRANSLATE_PROXY_BASE ? "（翻訳失敗：ネット/制限の可能性）" : "（翻訳失敗：ネット/CORSの可能性。PROXYを設定すると改善します）");
       const el = panelLyrics.querySelector('.lyLine[data-i="'+i+'"] .jp');
       if (el && jpOn) el.textContent = ln.jp;
       setCur(ln.en, ln.jp);
-      setStatus("TRANSLATE FAILED");
+      setStatus(TRANSLATE_PROXY_BASE ? "TRANSLATE FAILED" : "TRANSLATE FAILED (CORS?)");
     });
 }
 
