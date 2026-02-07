@@ -1,7 +1,7 @@
 {
-  "name": "LyricsPocket (FIX6f share)",
+  "name": "LyricsPocket (auto-next)",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=fix6f",
+  "start_url": "./index.html?v=fix6dd",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
