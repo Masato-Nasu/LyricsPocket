@@ -1,3 +1,5 @@
+function __showErr(msg){ try{ const p=document.getElementById('errPanel'); if(p){ p.style.display='block'; p.textContent='APP ERROR\n'+msg; } }catch(_){} }
+try{
 // LyricsPocket PWA (Minimal)
 // - Audio files: import via FILES (multiple). FOLDER uses showDirectoryPicker when supported.
 // - Lyrics files: import via LYRICS (txt/lrc). Auto-link by normalized base name.
@@ -724,11 +726,10 @@ btnOnlineTranslate.addEventListener("click", () => {
 });
 
 // ---------- Service Worker ----------
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register(new URL("sw.js", location.href)).catch(()=>{});
+);
   });
 }
 
 // Initial
 updatePlayButton();
+}catch(e){ __showErr(e && e.stack ? e.stack : String(e)); }
