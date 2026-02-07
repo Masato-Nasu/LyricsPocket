@@ -722,10 +722,6 @@ audio.addEventListener("ended", async () => {
   selectTrack(ni);
   await playSelectedTrack();
 });
-  } else {
-    updatePlayButton();
-  }
-});
 
 // ---------- Keep Awake ----------
 async function enableWakeLock(on) {
