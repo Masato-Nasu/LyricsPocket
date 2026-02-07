@@ -1,43 +1,42 @@
 <!doctype html>
-<html lang="ja"><head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LyricsPocket SW Reset</title>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SW Reset</title>
 <style>
-body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial; margin:20px; line-height:1.6; background:#0b0e14; color:rgba(255,255,255,.92);}
-.box{padding:14px 16px; border:1px solid rgba(255,255,255,.14); border-radius:14px; background:rgba(255,255,255,.04);}
-pre{white-space:pre-wrap; color:rgba(255,255,255,.75);}
-a{color:rgba(160,220,255,.95)}
-</style></head>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; padding:18px}
+pre{white-space:pre-wrap}
+</style>
+</head>
 <body>
-<h2>Service Worker Reset (SWRescue v1) (OneFileReset v3)</h2>
-<div class="box">
-<p>古い Service Worker と Cache を削除します。完了後、自動でトップへ移動します。</p>
-<pre id="log">Running...</pre>
-</div>
+<h2>Service Worker / Cache Reset</h2>
+<p>実行後、自動で index.html に戻ります。</p>
+<pre id="log">working...</pre>
 <script>
 (async function(){
   const log = (t)=>{ document.getElementById("log").textContent += "\n" + t; };
   try{
-    if ("serviceWorker" in navigator) {
+    if ("serviceWorker" in navigator){
       const regs = await navigator.serviceWorker.getRegistrations();
-      log("registrations: " + regs.length);
-      await Promise.all(regs.map(r => r.unregister()));
-      log("unregistered");
-    } else {
-      log("serviceWorker not supported");
+      for (const r of regs){
+        try{ await r.unregister(); log("unregister ok"); }catch(e){ log("unregister err"); }
+      }
+    }else{
+      log("no serviceWorker");
     }
-    if ("caches" in window) {
+    if (window.caches){
       const keys = await caches.keys();
-      log("caches: " + keys.join(", "));
-      await Promise.all(keys.map(k => caches.delete(k)));
-      log("caches deleted");
+      for (const k of keys){
+        try{ await caches.delete(k); log("cache delete: "+k); }catch(e){}
+      }
     }
-    log("done -> redirect");
-    setTimeout(()=>location.href="./index.html?swreset=1", 500);
   }catch(e){
-    log("ERROR: " + (e && e.stack ? e.stack : String(e)));
+    log("error: " + String(e));
   }
+  const bust = "v=" + Date.now();
+  location.href = "./index.html?" + bust;
 })();
 </script>
-</body></html>
+</body>
+</html>
