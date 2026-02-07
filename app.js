@@ -265,17 +265,25 @@ async function translateToJP(text) {
 
   srcLine.textContent = trimmed;
 
+  const openUrl =
+    "https://translate.google.com/?sl=en&tl=ja&text=" +
+    encodeURIComponent(trimmed) +
+    "&op=translate";
+
+  const linkHtml = ` <a href="${openUrl}" target="_blank" rel="noopener" style="color: rgba(255,255,255,.85); text-decoration: underline;">OPEN TRANSLATE</a>`;
+
+  // Offline mode: copy + provide a one-tap fallback link
   if (!onlineTranslate) {
-    // offline mode: copy and tell user to use system translate
     try {
       await navigator.clipboard.writeText(trimmed);
-      jpLine.textContent = "COPIED. USE iOS/ANDROID TRANSLATE.";
+      jpLine.innerHTML = "COPIED. USE SYSTEM TRANSLATE." + linkHtml;
     } catch (_) {
-      jpLine.textContent = "COPY FAILED. SELECT & COPY MANUALLY.";
+      jpLine.innerHTML = "COPY FAILED. " + linkHtml;
     }
     return;
   }
 
+  // Online translate mode (MyMemory) + graceful fallback
   if (translationCache.has(trimmed)) {
     jpLine.textContent = translationCache.get(trimmed);
     return;
@@ -286,17 +294,34 @@ async function translateToJP(text) {
     const url = new URL("https://api.mymemory.translated.net/get");
     url.searchParams.set("q", trimmed);
     url.searchParams.set("langpair", "en|ja");
-    const res = await fetch(url.toString(), { method: "GET" });
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      cache: "no-store"
+    });
+
     const data = await res.json();
-    const jp = data?.responseData?.translatedText || "TRANSLATION FAILED";
+
+    // MyMemory sometimes returns responseStatus != 200 even if HTTP is 200
+    const status = Number(data?.responseStatus ?? 0);
+    const jp = data?.responseData?.translatedText;
+
+    if (!res.ok || status !== 200 || !jp) {
+      const detail = data?.responseDetails ? String(data.responseDetails) : "";
+      jpLine.innerHTML =
+        `TRANSLATION FAILED (${res.status}/${status}) ${detail ? "- " + detail : ""}.` + linkHtml;
+      return;
+    }
+
     translationCache.set(trimmed, jp);
     jpLine.textContent = jp;
   } catch (e) {
-    jpLine.textContent = "TRANSLATION FAILED";
+    jpLine.innerHTML = "TRANSLATION FAILED (NETWORK/CORS)." + linkHtml;
   }
 }
 
-function onTapLine(text) {
+function onTapLine(text) {(text) {
   translateToJP(text);
 }
 

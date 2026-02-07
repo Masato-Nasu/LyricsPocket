@@ -1,5 +1,5 @@
 // LyricsPocket PWA service worker (app shell only)
-const CACHE = "lyricspocket-pwa-v1";
+const CACHE = "lyricspocket-pwa-v2";
 const ASSETS = [
   "./",
   "./index.html",
