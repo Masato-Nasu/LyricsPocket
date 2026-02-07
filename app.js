@@ -39,6 +39,33 @@ let trackLyrics = new Map(); // trackId -> {kind, lines[]}
 let currentIndex = -1;
 
 const audio = new Audio();
+
+// Robust play helper (avoids Android Chrome play()/pause() interruption crash overlays)
+async function safePlay() {
+  try {
+    const p = safePlay();
+    if (p && typeof p.then === "function") await p;
+    return true;
+  } catch (e) {
+    const msg = String(e?.message || e || "");
+    // Common non-fatal cases: play interrupted by pause(), AbortError, NotAllowedError (no gesture)
+    if (/interrupted by a call to pause\(\)/i.test(msg) || /AbortError/i.test(msg)) {
+      // Retry shortly if still paused (NEXT/PREV often triggers this race)
+      await sleep(120);
+      try {
+        const p2 = safePlay();
+        if (p2 && typeof p2.then === "function") await p2;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+    // Don't hard-crash UI on play rejection
+    setStatus(`PLAY FAILED`);
+    return false;
+  }
+}
+
 audio.preload = "metadata";
 audio.playsInline = true;
 
@@ -114,8 +141,6 @@ function normalizeBase(name) {
   let x = name.toLowerCase();
   // strip extension if exists
   x = x.replace(/\.[a-z0-9]+$/i, "");
-  // strip leading track numbers like "01 - "
-  x = x.replace(/^\s*\d{1,3}\s*[-_.]*\s*/g, "");
   // remove (...) and [...]
   x = x.replace(/\(.*?\)/g, " ").replace(/\[.*?\]/g, " ");
   // remove non-alnum -> spaces
@@ -191,38 +216,6 @@ async function readTextFile(file) {
 }
 
 // ---------- Auto link lyrics ----------
-function findBestLyricsFileForTrack(track){
-  if (!track) return null;
-  // strict match first
-  const strict = lyricsFiles.find(l => l.normBase && l.normBase === track.normBase) || null;
-  if (strict) return strict;
-  // fuzzy includes
-  const cand = lyricsFiles.filter(l => l.normBase && track.normBase && (l.normBase.includes(track.normBase) || track.normBase.includes(l.normBase)));
-  if (!cand.length) return null;
-  cand.sort((a,b)=> (a.kind==="lrc"?-1:1) - (b.kind==="lrc"?-1:1));
-  return cand[0] || null;
-}
-
-async function ensureLyricsForTrack(track){
-  if (!track) return null;
-  // already parsed & linked?
-  const existing = trackLyrics.get(track.id);
-  if (existing) return existing;
-
-  const best = findBestLyricsFileForTrack(track);
-  if (!best || !best.file) return null;
-
-  try{
-    const text = await readTextFile(best.file);
-    const doc = (best.kind === "lrc") ? parseLRC(text) : parseTXT(text);
-    trackLyrics.set(track.id, doc);
-    return doc;
-  }catch(_){
-    return null;
-  }
-}
-
-
 async function loadLyricsFile(file) {
   const name = file.name;
   const kind = ext(name) === "lrc" ? "lrc" : "txt";
@@ -361,7 +354,7 @@ function renderTrackList() {
     play.textContent = "PLAY";
     play.addEventListener("click", () => {
       selectTrack(i);
-      audio.play();
+      safePlay();
       updatePlayButton();
 btnOnlineTranslate.textContent = `ONLINE JP: ${onlineTranslate ? "ON" : "OFF"}`;
 
@@ -544,7 +537,7 @@ function importAudioFiles(files) {
   }
 }
 
-async function importLyricsFiles /* AUTO_LINK_AFTER_LYRICS2 */(files) {
+async function importLyricsFiles(files) {
   const lyricFiles = files.filter(f => ["txt","lrc"].includes(ext(f.name)) || f.type === "text/plain");
   for (const f of lyricFiles) {
     await loadLyricsFile(f);
@@ -568,20 +561,7 @@ async function importLyricsFiles /* AUTO_LINK_AFTER_LYRICS2 */(files) {
     if (doc) renderLyrics(doc);
   }
 
-  // AUTO_LINK_AFTER_LYRICS2: prime mapping so track selection is instant
-  for (const t of tracks) {
-    if (trackLyrics.has(t.id)) continue;
-    const best = findBestLyricsFileForTrack(t);
-    if (best && best.file) {
-      try{
-        const text = await readTextFile(best.file);
-        const doc = (best.kind === "lrc") ? parseLRC(text) : parseTXT(text);
-        trackLyrics.set(t.id, doc);
-      }catch(_){}
-    }
-  }
-
-setStatus(`${tracks.length} FILES LOADED | LYRICS UPDATED`);
+  setStatus(`${tracks.length} FILES LOADED | LYRICS UPDATED`);
 }
 
 // ---------- Folder import (progressive enhancement) ----------
@@ -617,70 +597,40 @@ function selectTrack(index) {
   currentIndex = index;
   const t = tracks[index];
   audio.src = t.url;
-  try{ audio.currentTime = 0; }catch(_){ }
-  try{ audio.load(); }catch(_){ }
   audio.currentTime = 0;
   updatePlayButton();
   setStatus(`${tracks.length} FILES LOADED | ${t.title}`);
 
-  let doc = trackLyrics.get(t.id);
+  const doc = trackLyrics.get(t.id);
   renderLyrics(doc || null);
-
-  // Auto-select lyrics when a track is selected (based on already-imported lyrics files)
-  if (!doc) {
-    ensureLyricsForTrack(t).then(d => {
-      if (!d) return;
-      // still on the same track?
-      if (currentIndex === index) {
-        renderLyrics(d);
-        setStatus(`${tracks.length} FILES LOADED | LYRICS AUTO`);
-      }
-    });
-  }
   srcLine.textContent = "";
   jpLine.textContent = "TAP A LINE TO TRANSLATE";
 }
 
-// ---------- Reliable playback (Android-safe) ----------
-async function playSelectedTrack(){
-  try{
-    // force reload on Android
-    audio.pause();
-    audio.load();
-  }catch(_){}
-  // Wait a tick so src swap is applied
-  await new Promise(r => setTimeout(r, 60));
-  try{
-    await playSelectedTrack();
-  }catch(_){
-    // try once more after user gesture
-    await new Promise(r => setTimeout(r, 180));
-    try{ await audio.play(); }catch(__){}
-  }
-  updatePlayButton();
-}
-
-
 btnPlay.addEventListener("click", async () => {
   if (!tracks.length) return;
   if (currentIndex === -1) selectTrack(0);
-  if (audio.paused) await audio.play();
+  if (audio.paused) await safePlay();
   else audio.pause();
   updatePlayButton();
 });
 
-btnPrev.addEventListener("click", async () => {
+btnPrev.addEventListener("click", () => {
   if (!tracks.length) return;
-  const pi = (currentIndex < 0) ? 0 : ((currentIndex - 1 + tracks.length) % tracks.length);
-  selectTrack(pi);
-  await playSelectedTrack();
+  const ni = Math.max(0, currentIndex - 1);
+  audio.pause();
+  selectTrack(ni);
+  safePlay();
+  updatePlayButton();
 });
 
-btnNext.addEventListener("click", async () => {
+btnNext.addEventListener("click", () => {
   if (!tracks.length) return;
-  const ni = (currentIndex < 0) ? 0 : ((currentIndex + 1) % tracks.length);
+  const ni = Math.min(tracks.length - 1, currentIndex + 1);
+  audio.pause();
   selectTrack(ni);
-  await playSelectedTrack();
+  safePlay();
+  updatePlayButton();
 });
 
 btnFiles.addEventListener("click", () => inputAudio.click());
@@ -716,11 +666,14 @@ audio.addEventListener("timeupdate", () => {
 
 audio.addEventListener("play", updatePlayButton);
 audio.addEventListener("pause", updatePlayButton);
-audio.addEventListener("ended", async () => {
-  if (!tracks.length) return;
-  const ni = (currentIndex < 0) ? 0 : ((currentIndex + 1) % tracks.length);
-  selectTrack(ni);
-  await playSelectedTrack();
+audio.addEventListener("ended", () => {
+  // auto-next
+  if (currentIndex >= 0 && currentIndex < tracks.length - 1) {
+    selectTrack(currentIndex + 1);
+    audio.play().catch(()=>{});
+  } else {
+    updatePlayButton();
+  }
 });
 
 // ---------- Keep Awake ----------
@@ -759,22 +712,12 @@ btnOnlineTranslate.addEventListener("click", () => {
   }
 });
 
+// ---------- Service Worker ----------
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
 
-
-// ---------- Service Worker (safe) ----------
-(function(){
-  try{
-    const params = new URLSearchParams(location.search);
-    if (params.get("nosw") === "1") return;
-    if (!("serviceWorker" in navigator)) return;
-
-    window.addEventListener("load", async () => {
-      try{
-        const reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
-        try{ await reg.update(); }catch(_){}
-      }catch(e){
-        // do nothing; app still works without SW
-      }
-    });
-  }catch(_){}
-})();
+// Initial
+updatePlayButton();
