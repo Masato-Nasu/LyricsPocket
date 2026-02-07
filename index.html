@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=fix6dd">
+<link rel="manifest" href="./manifest.webmanifest?v=fix6g">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -257,16 +257,28 @@ function sendToTangoCho(word, example){
     u.searchParams.set("word", w);
     if (ex) u.searchParams.set("ex", ex);
     u.searchParams.set("src", "lyricspocket");
+
     const url = u.toString();
-    let opened = null;
-    try{ opened = window.open(url, "_blank"); }catch(e){}
-    if (opened){
-      // keep this page alive (state preserved)
-      toast("OPENED TANGO-CHO");
-    }else{
-      // fallback (may unload this page)
-      location.href = url;
+    const payload = ex ? (w + "\n" + ex) : w;
+
+    // 1) まずコピー（失敗しても続行）
+    try{
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(payload).catch(()=>{});
+      }
+    }catch(e){}
+
+    // 2) Android等：共有シート優先（TANGO-CHOが受け取れる場合は“いつものTANGO-CHO”に入りやすい）
+    if (navigator.share){
+      navigator.share({ title:"TANGO-CHO", text: payload, url })
+        .then(()=>{ toast("SHARED"); })
+        .catch(()=>{ toast("COPIED（TANGO-CHOで貼り付け）"); });
+      return;
     }
+
+    // 3) 共有が無い環境：勝手に開かず、コピーで渡す（別ストレージの“空TANGO-CHO”を開く事故を防ぐ）
+    toast("COPIED（TANGO-CHOで貼り付け）");
+    // 必要ならユーザーが自分でTANGO-CHOを開く
   }catch(e){
     toast("SEND FAILED");
   }
