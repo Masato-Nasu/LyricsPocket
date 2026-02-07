@@ -1,7 +1,7 @@
 {
-  "name": "LyricsPocket",
+  "name":"LyricsPocket OneFileReset",
   "short_name": "LyricsPocket",
-  "start_url":"./",
+  "start_url":"./index.html",
   "scope":"./",
   "display": "standalone",
   "background_color": "#000000",
