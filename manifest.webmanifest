@@ -1,7 +1,7 @@
 {
   "name": "LyricsPocket",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=deepl2d",
+  "start_url": "./index.html?v=deepl2e",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
