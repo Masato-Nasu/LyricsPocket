@@ -72,17 +72,45 @@ label.btn{gap:8px}
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket v1.3 (MINIMAL)</div>
+  <div class="h1">LyricsPocket v1.3 (CLEAN-UI)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
-<div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（その場合は OPEN(Google翻訳) でGoogle翻訳へ送れます）。</div>
+<div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（環境によって失敗する場合があります）。</div>
 
-  <div class="body">
-      <a class="btn danger" href="#"></a>
-      <div class="small" style="margin-top:10px">※ 反映がおかしい／真っ白になる場合は、上のボタン→戻る→再読み込み。</div>
-<hr>
-
+  <div class="pane">
+    <div class="head">
+      <div class="row" style="flex:1">
+        <label for="inAudio" class="btn primary">AUDIOを選ぶ</label>
+        <label for="inLyrics" class="btn">LYRICSを選ぶ</label>
+        <button id="btnPlay" class="btn ok">PLAY</button>
+        <button id="btnPrev" class="btn">PREV</button>
+        <button id="btnNext" class="btn">NEXT</button>
+        <button id="btnList" class="btn">LIST</button>
+        <button id="btnJP" class="pill on" type="button">JP: ON</button>
+</div>
     </div>
+    <div class="body">
+      <div id="chipTrack" class="pill off" style="display:inline-flex">TRACK: (未選択)</div>
+      <div style="height:10px"></div>
+      <audio id="audio" controls playsinline></audio>
+      <div style="height:10px"></div>
+      <div id="status" class="status">READY</div>
+      <div style="height:10px"></div>
+      <div id="curLine" class="status">EN:
+JP:</div>
+    </div>
+
+    <div id="panelLists" class="body">
+      <div class="small">TRACKS</div>
+      <div id="trackList" class="list"></div>
+      <div style="height:12px"></div>
+      <div class="small">LYRICS</div>
+      <div id="lyricList" class="list"></div>
+      <div class="small" style="margin-top:10px">曲と歌詞が自動一致しない場合：曲を選んでから、下のLYRICSをタップして切り替えてください（端末に保存します）。</div>
+    </div>
+
+    <div id="panelLyrics" class="list"></div>
   </div>
+</div>
 
   <input id="inAudio" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg" multiple
          style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0" />
@@ -126,6 +154,14 @@ var listOn = true;
 function setStatus(t){
   statusEl.textContent = String(t);
 }
+    var url = "https://translate.google.com/?sl=en&tl=ja&text=" + encodeURIComponent(text) + "&op=translate";
+// removed
+// removed
+// removed
+// removed
+  }catch(e){}
+}
+
 function setCur(en, jp){
   curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + (jp||"");
   
@@ -574,7 +610,7 @@ btnNext.addEventListener("click", function(){
 
 btnList.addEventListener("click", toggleList);
 btnJP.addEventListener("click", toggleJP);
-
+// removed
 
 
 // follow lyrics with time (poller: more reliable than timeupdate on some Android/PWA)
@@ -609,7 +645,7 @@ audioEl.addEventListener("pause", stopSync);
 audioEl.addEventListener("ended", stopSync);
 
 // initial UI
-setStatus("JS OK (v1.3 MINIMAL)");
+setStatus("JS OK (v1.3 CLEAN-UI)");
 renderTrackList();
 renderLyricList();
 

@@ -1,7 +1,7 @@
 {
-  "name": "LyricsPocket v1.3 MINIMAL",
+  "name": "LyricsPocket v1.3 CLEAN-UI",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=min2",
+  "start_url": "./index.html?v=cleanui",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
