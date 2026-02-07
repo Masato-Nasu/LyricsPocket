@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=fix3">
+<link rel="manifest" href="./manifest.webmanifest?v=fix4b">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -79,7 +79,7 @@ label.btn{gap:8px}
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket v1.3 (FIX4 → TANGO-CHO)</div>
+  <div class="h1">LyricsPocket v1.3 (FIX5b → TANGO-CHO)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
   <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります。</div>
 
@@ -105,6 +105,9 @@ label.btn{gap:8px}
       <div style="height:10px"></div>
       <div id="curLine" class="status">EN:
 JP:</div>
+      <div style="height:10px"></div>
+      <div class="small">WORDS（タップでTANGO-CHOへ）</div>
+      <div id="wordChips" class="wordChips"></div>
     </div>
 
     <div id="panelLists" class="body">
@@ -272,36 +275,76 @@ function clearTracks(){
 }
 
 function parseLRC(text){
-  const s = String(text||"").replace(/\r/g,"");
-  const lines = s.split("\n");
+  // Robust LRC parser:
+  // - strips UTF-8 BOM
+  // - ignores [ti:], [ar:], [al:], [by:], [offset:] etc.
+  // - applies [offset:ms]
+  // - ignores speaker tags like [Shara Nelson]
+  // - if timed LRC is present, drops untimed bracket lines to keep sync stable
+  let s = String(text||"");
+  s = s.replace(/^\uFEFF/, ""); // BOM
+  s = s.replace(/\r/g, "");
+  const rawLines = s.split("\n");
+
   const out = [];
   let hasTime = false;
-  for (const line0 of lines){
-    const line = (line0||"").trimEnd();
-    if (!line.trim()) continue;
-    if (/^\[[a-z]{1,8}:/i.test(line.trim())) continue;
+  let offsetMs = 0;
 
-    const tags = line.match(/\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/g);
+  const timeRe = /\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/g;
+
+  for (let line0 of rawLines){
+    let line = String(line0||"").trimEnd();
+    if (!line.trim()) continue;
+
+    // strip BOM if it appears mid-file
+    line = line.replace(/^\uFEFF/, "");
+
+    // [offset:500]
+    const mo = /^\[\s*offset\s*:\s*(-?\d+)\s*\]\s*$/i.exec(line.trim());
+    if (mo){
+      offsetMs = parseInt(mo[1],10) || 0;
+      continue;
+    }
+
+    // metadata like [ti:...], [ar:...], [by:...]
+    if (/^\[\s*[a-z]{1,12}\s*:\s*.*\]\s*$/i.test(line.trim())) continue;
+
+    // speaker / bracket tags with no time (e.g. [Shara Nelson])
+    timeRe.lastIndex = 0;
+    if (/^\[[^\]]+\]\s*$/.test(line.trim()) && !timeRe.test(line)){
+      timeRe.lastIndex = 0;
+      continue;
+    }
+    timeRe.lastIndex = 0;
+
+    const tags = line.match(timeRe);
     if (tags && tags.length){
       hasTime = true;
-      const plain = line.replace(/\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/g,"").trim();
+      const plain = line.replace(timeRe, "").trim();
       if (!plain) continue;
 
       for (const tg of tags){
-        const m = /\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/.exec(tg);
-        if (!m) continue;
-        const min = parseInt(m[1],10)||0;
-        const sec = parseInt(m[2],10)||0;
-        const frac = m[3] ? String(m[3]) : "";
+        const mm = /\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/.exec(tg);
+        if (!mm) continue;
+        const min = parseInt(mm[1],10)||0;
+        const sec = parseInt(mm[2],10)||0;
+        const frac = mm[3] ? String(mm[3]) : "";
         let ms = 0;
         if (frac) ms = parseInt((frac+"00").slice(0,3),10)||0;
-        out.push({t:min*60+sec+ms/1000, en:plain, jp:null});
+        let t = (min*60)+sec+(ms/1000)+(offsetMs/1000);
+        if (t < 0) t = 0;
+        out.push({t, en:plain, jp:null});
       }
     }else{
       out.push({t:null, en:line.trim(), jp:null});
     }
   }
-  if (hasTime) out.sort((a,b)=>(a.t||0)-(b.t||0));
+
+  if (hasTime){
+    const timed = out.filter(x => x.t !== null);
+    timed.sort((a,b)=>a.t-b.t);
+    return timed;
+  }
   return out;
 }
 
@@ -647,7 +690,7 @@ wordChipsEl.addEventListener("click", (e)=>{
 });
 
 // init
-setStatus("JS OK (FIX4 TANGO)");
+setStatus("JS OK (FIX5b TANGO)");
 setCur("","");
 renderWordChips("");
 renderTrackList();

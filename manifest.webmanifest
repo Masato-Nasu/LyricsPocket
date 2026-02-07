@@ -1,7 +1,7 @@
 {
-  "name": "LyricsPocket FIX4 → TANGO-CHO",
+  "name": "LyricsPocket FIX5 → TANGO-CHO (LRC stronger)",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=fix4",
+  "start_url": "./index.html?v=fix5",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
