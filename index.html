@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>LyricsPocket PWA</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="app" class="app">
+    <header class="status">
+      <div id="statusText" class="status__text">NO FILES LOADED</div>
+      <div class="status__right">
+        <button id="btnKeepAwake" class="chip" title="画面スリープ抑止（対応ブラウザのみ）">KEEP AWAKE: OFF</button>
+        <button id="btnOnlineTranslate" class="chip" title="オンライン翻訳（MyMemory）を使う">ONLINE JP: OFF</button>
+      </div>
+    </header>
+
+    <section class="lyrics">
+      <div id="lyricsEmpty" class="lyrics__empty">
+        <div class="mono dim">NO LYRICS LINKED</div>
+        <div class="mono faint">IMPORT .TXT / .LRC</div>
+      </div>
+      <div id="lyricsList" class="lyrics__list" aria-label="Lyrics"></div>
+    </section>
+
+    <section class="translate">
+      <div id="srcLine" class="translate__src"></div>
+      <div id="jpLine" class="translate__jp mono faint">TAP A LINE TO TRANSLATE</div>
+    </section>
+
+    <footer class="controls">
+      <button id="btnFolder" class="btn">FOLDER</button>
+      <button id="btnFiles" class="btn">FILES</button>
+      <button id="btnPlay" class="btn">PLAY</button>
+      <button id="btnPrev" class="btn">PREV</button>
+      <button id="btnNext" class="btn">NEXT</button>
+      <button id="btnLyrics" class="btn">LYRICS</button>
+      <button id="btnList" class="btn">LIST</button>
+    </footer>
+
+    <input id="inputAudio" type="file" accept="audio/*" multiple hidden />
+    <input id="inputLyrics" type="file" accept=".lrc,.txt,text/plain" multiple hidden />
+
+    <dialog id="dlgList" class="dlg">
+      <div class="dlg__panel">
+        <div class="dlg__head">
+          <div class="mono">FILES</div>
+          <button id="btnCloseList" class="chip">CLOSE</button>
+        </div>
+        <div id="trackList" class="dlg__list"></div>
+        <div class="dlg__foot mono faint">
+          Auto-link rule: same base name (e.g., <span class="mono">Song.m4a</span> + <span class="mono">Song.lrc</span>)
+        </div>
+      </div>
+    </dialog>
+  </main>
+
+  <script src="./app.js" type="module"></script>
+</body>
+</html>
