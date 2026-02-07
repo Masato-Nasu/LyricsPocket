@@ -69,21 +69,10 @@ audio{width:100%}
 label.btn{gap:8px}
 </style>
 
-<script>
-/* SW: 古い壊れたSWループから抜けるため、無害SWを上書き登録 */
-(function(){
-  try{
-    if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("./sw.js", {scope:"./"}).then(function(reg){
-      try{ reg.update(); }catch(e){}
-    }).catch(function(){});
-  }catch(e){}
-})();
-</script>
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket (v1.3 SIMPLE)</div>
+  <div class="h1">LyricsPocket (v1.3 NO-SW)</div>
   <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
 <div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（環境によって失敗する場合があります）。</div>
 
@@ -103,6 +92,7 @@ label.btn{gap:8px}
       <div id="chipTrack" class="pill off" style="display:inline-flex">TRACK: (未選択)</div>
       <div style="height:10px"></div>
       <audio id="audio" controls playsinline></audio>
+      <div id="audState" class="small" style="margin-top:8px">audio: (idle)</div>
       <div style="height:10px"></div>
       <div id="status" class="status">READY</div>
       <div style="height:10px"></div>
@@ -147,6 +137,7 @@ var inAudio = $("inAudio");
 var inLyrics = $("inLyrics");
 var audioEl = $("audio");
 var statusEl = $("status");
+var audStateEl = $("audState");
 var curLineEl = $("curLine");
 var chipTrack = $("chipTrack");
 var trackListEl = $("trackList");
@@ -171,6 +162,19 @@ var currentLines = []; // active lyric lines
 var currentLineIndex = -1;
 var jpOn = true;
 var listOn = true;
+
+function setAudState(){
+  try{
+    if (!audStateEl) return;
+    var rs = audioEl.readyState;
+    var ns = audioEl.networkState;
+    var dur = isFinite(audioEl.duration) ? audioEl.duration.toFixed(2) : "NaN";
+    var ct = isFinite(audioEl.currentTime) ? audioEl.currentTime.toFixed(2) : "NaN";
+    var src = audioEl && audioEl.src ? (audioEl.src.startsWith("blob:") ? "blob" : audioEl.src) : "(none)";
+    var err = audioEl.error ? ("errCode=" + audioEl.error.code) : "";
+    audStateEl.textContent = "audio: paused=" + audioEl.paused + " rs=" + rs + " ns=" + ns + " t=" + ct + "/" + dur + " src=" + src + " " + err;
+  }catch(e){}
+}
 
 function setStatus(t){
   statusEl.textContent = String(t);
@@ -317,7 +321,9 @@ function selectTrack(i){
   autoPickLyricsForTrack(tr.name);
   // set audio source but do not autoplay
   audioEl.src = tr.url;
+  try{ audioEl.preload = "auto"; }catch(e){}
   audioEl.load();
+  setAudState();
   renderTrackList();
   setStatus("TRACK READY: " + tr.name);
 }
@@ -597,11 +603,17 @@ btnPlay.addEventListener("click", function(){
     setStatus("NO TRACK");
     return;
   }
-  audioEl.play().then(function(){
+  try{ audioEl.muted = false; audioEl.volume = 1; }catch(e){}
+audioEl.play().then(function(){
     setStatus("PLAYING");
+    setAudState();
     startSync();
   }).catch(function(err){
-    setStatus("PLAY BLOCKED: " + String(err && err.name ? err.name : err));
+    var n = (err && err.name) ? err.name : String(err||"");
+    setAudState();
+    if (n === "NotAllowedError") setStatus("PLAY BLOCKED: ①もう一度PLAY ②下のaudio▶︎を直接押す");
+    else if (n === "NotSupportedError") setStatus("PLAY FAILED: NotSupported (形式非対応の可能性。mp3推奨)");
+    else setStatus("PLAY FAILED: " + n);
   });
 });
 
@@ -618,6 +630,22 @@ btnNext.addEventListener("click", function(){
 });
 
 btnList.addEventListener("click", toggleList);
+
+// audio diagnostics
+audioEl.addEventListener("loadedmetadata", setAudState);
+audioEl.addEventListener("canplay", setAudState);
+audioEl.addEventListener("playing", setAudState);
+audioEl.addEventListener("pause", setAudState);
+audioEl.addEventListener("stalled", setAudState);
+audioEl.addEventListener("waiting", setAudState);
+audioEl.addEventListener("error", function(){
+  setAudState();
+  try{
+    var c = audioEl.error ? audioEl.error.code : 0;
+    setStatus("AUDIO ERROR code=" + String(c));
+  }catch(e){}
+});
+
 btnJP.addEventListener("click", toggleJP);
 // removed
 
@@ -655,7 +683,8 @@ audioEl.addEventListener("pause", stopSync);
 audioEl.addEventListener("ended", stopSync);
 
 // initial UI
-setStatus("JS OK (v1.3 SIMPLE)");
+setStatus("JS OK (v1.3 NO-SW)");
+setAudState();
 renderTrackList();
 renderLyricList();
 
