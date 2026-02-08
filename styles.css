@@ -1,13 +1,1 @@
 /* unused */
-
-/* ---- No page scroll (internal scroller) [deepl2l] ---- */
-html, body {
-  height: 100%;
-  overflow: hidden;
-}
-.mainScroll {
-  height: calc(100vh - 130px); /* header+buttons+fixed line bar */
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 24px;
-}

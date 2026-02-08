@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=deepl2l">
+<link rel="manifest" href="./manifest.webmanifest?v=deepl2m">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -84,7 +84,6 @@ label.btn{gap:8px}
 <body>
 <div class="wrap">
   <div class="h1">LyricsPocket</div>
-  <div id="mainScroll" class="mainScroll">
 <div class="pane">
     <div class="head">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1">
@@ -173,9 +172,7 @@ const btnNext = $("btnNext");
 const btnList = $("btnList");
 const btnJP = $("btnJP");
 
-let tracks = [];
-let albumSessionToken = 0; // increments when switching albums to ignore late async callbacks
-     // {name,url}
+let tracks = [];     // {name,url}
 let trackIndex = -1;
 
 let lyricsMap = new Map(); // key -> {name, lines:[{t,en,jp}]}
@@ -433,9 +430,6 @@ function renderLyrics(){
     panelLyrics.innerHTML = '<div class="lyLine"><div class="en" style="opacity:.75">歌詞がありません。LYRICSを選ぶ で .lrc/.txt を読み込むか、下のLYRICSから選択してください。</div></div>';
     setCur("","");
 renderWordChips("");
-  try{ if (typeof chipLyric!=="undefined" && chipLyric){ chipLyric.textContent="LYRICS: (未選択)"; chipLyric.className="pill off"; } }catch(e){}
-  // clear lyrics picker so selecting same files again triggers change
-  try{ inLyrics.value = ""; }catch(e){}
     return;
   }
   for (let i=0;i<currentLines.length;i++){
@@ -499,8 +493,6 @@ function stopSync(){
 }
 
 function selectTrack(i){
-  // If lyrics are not loaded for this album, never keep old lyrics visible
-  if (!lyricsLoaded){ try{ clearLyrics(); }catch(e){} }
   if (!(i>=0 && i<tracks.length)) return;
   trackIndex = i;
   const tr = tracks[i];
@@ -585,7 +577,6 @@ function openGoogleTranslate(text){
 }
 
 function maybeTranslateLine(i){
-  const tok = albumSessionToken;
   if (!jpOn) return;
   if (!(i>=0 && i<currentLines.length)) return;
   const ln = currentLines[i];
@@ -613,8 +604,7 @@ function maybeTranslateLine(i){
 
       // quota / rate limit
       if (status === 429 || /USED ALL AVAILABLE FREE TRANSLATIONS/i.test(details) || /quota/i.test(details)){
-        if (tok !== albumSessionToken) return;
-      ln.jp = "（翻訳制限中：タップでGoogle翻訳）";
+        ln.jp = "（翻訳制限中：タップでGoogle翻訳）";
         ln._jpFallback = "google";
         renderLyrics();
         setCur(ln.en, ln.jp);
@@ -633,7 +623,6 @@ function maybeTranslateLine(i){
         return;
       }
 
-      if (tok !== albumSessionToken) return;
       ln.jp = "（翻訳失敗：タップでGoogle翻訳）";
       ln._jpFallback = "google";
       renderLyrics();
@@ -641,7 +630,6 @@ function maybeTranslateLine(i){
       setStatus("TRANSLATE FAILED");
     })
     .catch(()=>{
-      if (tok !== albumSessionToken) return;
       ln.jp = "（翻訳失敗：タップでGoogle翻訳）";
       ln._jpFallback = "google";
       renderLyrics();
@@ -652,61 +640,30 @@ function maybeTranslateLine(i){
 
 // ----- events -----
 inAudio.addEventListener("change", ()=>{
-  const tok = albumSessionToken;
-try{
-    // Album overwrite or re-pick: clear old state first
-    try{ if (typeof resetAlbumSession === "function") resetAlbumSession("ALBUM RESET (AUDIO)"); }catch(e){}
+  try{
     clearTracks();
-    try{ lyricsLoaded = false; }catch(e){}
-
     let files = Array.from(inAudio.files || []);
-    if (!files.length){
-      setStatus("AUDIO: CANCELLED");
-      return;
-    }
-
     files = files.filter(f=>{
       const n = (f.name||"").toLowerCase();
       const t = (f.type||"").toLowerCase();
       if (t && t.startsWith("audio/")) return true;
       return /\.(mp3|m4a|aac|wav|flac|ogg|mp4|m4p)$/i.test(n);
     });
-
-    if (!files.length){
-      setStatus("AUDIO: NO SUPPORTED FILES (mp3/m4a推奨)");
-      return;
-    }
-
-    let added = 0;
     for (const f of files){
-      try{
-        const url = URL.createObjectURL(f);
-        tracks.push({name:f.name, url:url});
-        added++;
-      }catch(err){
-        // keep going
-      }
+      tracks.push({name:f.name, url:URL.createObjectURL(f)});
     }
-
-    if (!added){
-      setStatus("AUDIO ERROR: createObjectURL failed");
-      return;
-    }
-
     setStatus("AUDIO LOADED: " + tracks.length);
     renderTrackList();
     if (tracks.length) selectTrack(0);
   }catch(e){
-    // Show actual error so we can diagnose
-    const msg = (e && (e.message || e.name)) ? (e.message || e.name) : String(e||"");
-    setStatus("AUDIO ERROR: " + msg);
+    setStatus("AUDIO ERROR");
   }finally{
-    // allow re-selecting the same files next time
-    try{ inAudio.value = ""; }catch(e){}
+    inAudio.value = "";
   }
-});inLyrics.addEventListener("change", ()=>{
-  const tok = albumSessionToken;
-const files = Array.from(inLyrics.files || []);
+});
+
+inLyrics.addEventListener("change", ()=>{
+  const files = Array.from(inLyrics.files || []);
   if (!files.length){ inLyrics.value=""; return; }
   let left = files.length;
   setStatus("LYRICS LOADING...");
@@ -870,7 +827,7 @@ window.addEventListener("unhandledrejection", (ev)=>{
 });
 
 // init
-setStatus("JS OK (deepl2e / album lyrics isolation)");
+setStatus("JS OK (fix6dd / auto-next) (FIX6db TANGO)");
 setCur("","");
 renderWordChips("");
 renderTrackList();
