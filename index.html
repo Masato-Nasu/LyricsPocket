@@ -200,6 +200,7 @@ function setStatus(t){ statusEl.textContent = String(t); }
 function setCur(en, jp){ curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + (jp||""); }
 
 const TANGO_CHO_URL = "https://masato-nasu.github.io/TANGO-CHO/"; // 連動先（必要なら変更）
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 function toast(msg){
   try{
@@ -276,12 +277,12 @@ function sendToTangoCho(word, example){
     // 1) まずコピー（失敗しても続行）
     try{
       if (navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(payload).catch(()=>{});
+        navigator.clipboard.writeText(w).catch(()=>{});
       }
     }catch(e){}
 
     // 2) Android等：共有シート優先（TANGO-CHOが受け取れる場合は“いつものTANGO-CHO”に入りやすい）
-    if (navigator.share){
+    if (!IS_IOS && navigator.share){
       navigator.share({ title:"TANGO-CHO", text: payload, url })
         .then(()=>{ toast("SHARED"); })
         .catch(()=>{ toast("COPIED（TANGO-CHOで貼り付け）"); });
