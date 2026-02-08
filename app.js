@@ -301,10 +301,6 @@ function highlightLine(i){
   }
   const ln = currentLines[i];
   setCur(ln.en, jpOn ? (ln.jp||"") : "");
-  const cur = panelLyrics.querySelector(".lyLine.current");
-  if (cur && cur.scrollIntoView){
-    cur.scrollIntoView({block:"center", behavior:"smooth"});
-  }
 }
 
 function findLineIndexByTime(t){
