@@ -7,8 +7,6 @@
 - **対応**: PC（Chrome/Edge/Safari） / iPhone（Safari・PWA） / Android（Chrome・PWA）
 - **重要**: 音源・歌詞は **配布しません**。ユーザーが所有／許諾を得たファイルを端末から選択して使う前提です。
 
-![screenshot](screenshot1.png)
-
 ---
 
 ## できること / Features
