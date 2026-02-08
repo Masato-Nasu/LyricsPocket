@@ -125,7 +125,7 @@ JP:</div>
 
   <input id="inAudio" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg" multiple
          style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0" />
-  <input id="inLyrics" type="file" accept=".lrc,.txt,text/plain" multiple
+  <input id="inLyrics" type="file" accept=".lrc,.LRC,.txt,.TXT,text/plain,text/*" multiple
          style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0" />
 </div>
 
@@ -495,6 +495,8 @@ function highlightLine(i){
   const ln = currentLines[i];
   setCur(ln.en, jpOn ? (ln.jp||"") : "");
   renderWordChips(ln.en);
+  const cur = panelLyrics.querySelector(".lyLine.current");
+  if (cur && cur.scrollIntoView) cur.scrollIntoView({block:"center", behavior:"smooth"});
 }
 
 function findLineIndexByTime(t){
