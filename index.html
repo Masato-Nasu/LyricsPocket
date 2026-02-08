@@ -201,6 +201,8 @@ function setCur(en, jp){ curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + 
 
 const TANGO_CHO_URL = "https://masato-nasu.github.io/TANGO-CHO/"; // 連動先（必要なら変更）
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const IS_DESKTOP = !IS_MOBILE;
 
 function toast(msg){
   try{
@@ -280,6 +282,15 @@ function sendToTangoCho(word, example){
         navigator.clipboard.writeText(w).catch(()=>{});
       }
     }catch(e){}
+
+    // 1.5) PC：新しいタブでTANGO-CHOを自動で開く（ポップアップがブロックされたらコピー導線にフォールバック）
+    if (IS_DESKTOP){
+      let opened = null;
+      try{ opened = window.open(url, "_blank", "noopener,noreferrer"); }catch(e){ opened = null; }
+      if (opened) toast("OPENED → TANGO-CHO");
+      else toast("POPUP BLOCKED（TANGO-CHOで貼り付け）");
+      return;
+    }
 
     // 2) Android等：共有シート優先（TANGO-CHOが受け取れる場合は“いつものTANGO-CHO”に入りやすい）
     if (!IS_IOS && navigator.share){
