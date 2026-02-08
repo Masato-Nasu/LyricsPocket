@@ -45,6 +45,7 @@ const audioEl  = $("audio");
 
 const statusEl = $("status");
 const curLineEl = $("curLine");
+const curLineFixedEl = $("curLineFixed");
 const chipTrack = $("chipTrack");
 
 const trackListEl = $("trackList");
@@ -75,7 +76,12 @@ let syncTimer = null;
 
 // ---------- UI helpers ----------
 function setStatus(t){ statusEl.textContent = String(t); }
-function setCur(en, jp){ curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + (jp||""); }
+function setCur(en, jp){
+  const t = "EN: " + (en||"") + "
+JP: " + (jp||"");
+  curLineEl.textContent = t;
+  try{ if (curLineFixedEl) curLineFixedEl.textContent = t; }catch(e){}
+}
 
 // ---------- filename matching ----------
 function baseName(name){

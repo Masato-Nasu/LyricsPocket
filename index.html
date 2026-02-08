@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=deepl2h">
+<link rel="manifest" href="./manifest.webmanifest?v=deepl2j">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -79,22 +79,38 @@ label.btn{gap:8px}
 .wlink{cursor:pointer;border-bottom:1px dotted rgba(96,165,250,.55); padding-bottom:1px}
 .wlink:hover{border-bottom-color:rgba(96,165,250,.95)}
 
-/* Current line sticky bar */
-#curLineBar{
-  position: sticky;
-  top: 10px;
-  z-index: 50;
+/* ---- Fixed current line (always visible) ---- */
+body{ padding-top: 92px; } /* reserve space for fixed bar */
+.curFixedWrap{
+  position:fixed;
+  top: env(safe-area-inset-top, 0px);
+  left:0; right:0;
+  padding:10px 14px;
+  z-index:9998;
+  pointer-events:none; /* don't block taps on buttons below */
 }
-#curLineBar .status{
-  background: rgba(0,0,0,.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+.curFixedInner{ max-width:980px; margin:0 auto; }
+.curFixed{
+  background:rgba(11,14,20,.92);
+  backdrop-filter: blur(10px);
+  border:1px solid rgba(255,255,255,.14);
 }
+
+
+
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="h1">LyricsPocket</div>
+
+  <div id="curLineFixedWrap" class="curFixedWrap">
+    <div class="curFixedInner">
+      <div id="curLineFixed" class="status curFixed">EN:
+JP:</div>
+    </div>
+  </div>
+
 <div class="pane">
     <div class="head">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1">
@@ -115,8 +131,8 @@ label.btn{gap:8px}
       <div style="height:10px"></div>
       <div id="status" class="status">READY</div>
       <div style="height:10px"></div>
-      <div id="curLineBar"><div id="curLine" class="status">EN:
-JP:</div></div>
+      <div id="curLine" class="status">EN:
+JP:</div>
       <div style="height:10px"></div>
       <div class="small">WORDS（タップでTANGO-CHOへ）</div>
       <div id="wordChips" class="wordChips"></div>
