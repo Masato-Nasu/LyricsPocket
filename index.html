@@ -131,7 +131,13 @@ JP:</div>
 
 <script>
 
-try{ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); } }catch(e){}
+try{
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", ()=>{
+      navigator.serviceWorker.register("./sw.js", { scope:"./" }).catch(()=>{});
+    });
+  }
+}catch(e){}
 "use strict";
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -495,6 +501,7 @@ function highlightLine(i){
   const ln = currentLines[i];
   setCur(ln.en, jpOn ? (ln.jp||"") : "");
   renderWordChips(ln.en);
+  const cur = panelLyrics.querySelector(".lyLine.current");
 }
 
 function findLineIndexByTime(t){

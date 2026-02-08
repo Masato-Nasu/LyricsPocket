@@ -9,35 +9,7 @@ function escapeHTML(s){
   });
 }
 
-// ---------- Silent SW cleanup (no UI) ----------
-// If a broken SW is still controlling this scope, unregister it ONCE and reload once.
-(function swCleanupOnce(){
-  try{
-    if (!("serviceWorker" in navigator)) return;
-    if (!navigator.serviceWorker.controller) return;
-    if (localStorage.getItem("lp_sw_cleanup_done_fix2") === "1") return;
-
-    // mark now to avoid loops even if something fails
-    localStorage.setItem("lp_sw_cleanup_done_fix2","1");
-
-    Promise.resolve()
-      .then(()=>navigator.serviceWorker.getRegistrations())
-      .then((regs)=>{
-        return Promise.all(regs.map(r=>r.unregister().catch(()=>false)));
-      })
-      .then(()=>{
-        if (!("caches" in window)) return;
-        return caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k).catch(()=>false))));
-      })
-      .then(()=>{
-        // reload once to detach from old SW
-        const u = new URL(location.href);
-        u.searchParams.set("v","fix-" + Date.now());
-        location.replace(u.toString());
-      })
-      .catch(()=>{ /* ignore */ });
-  }catch(e){ /* ignore */ }
-})();
+// (SW cleanup removed: PWA installability requires SW to stay registered)
 
 const inAudio = $("inAudio");
 const inLyrics = $("inLyrics");
