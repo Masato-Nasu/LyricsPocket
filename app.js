@@ -1,5 +1,7 @@
-\
 "use strict";
+// Auto-follow current lyric line (scroll). User requested OFF.
+const AUTO_FOLLOW = false;
+
 
 // ---------- DOM helpers ----------
 function $(id){ return document.getElementById(id); }
@@ -303,7 +305,7 @@ function highlightLine(i){
   setCur(ln.en, jpOn ? (ln.jp||"") : "");
   const cur = panelLyrics.querySelector(".lyLine.current");
   if (cur && cur.scrollIntoView){
-    cur.scrollIntoView({block:"center", behavior:"smooth"});
+    if (AUTO_FOLLOW) curif (AUTO_FOLLOW) .scrollIntoView({block:"center", behavior:"smooth"});
   }
 }
 
