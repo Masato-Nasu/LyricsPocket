@@ -1,10 +1,16 @@
 {
-  "name": "LyricsPocket v1.3 NO-SW",
+  "name": "LyricsPocket",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=deepl2s",
+  "start_url": "./index.html?v=deepl2h",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
   "theme_color": "#0b0e14",
-  "icons": []
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E",
+      "sizes": "32x32",
+      "type": "image/svg+xml"
+    }
+  ]
 }
