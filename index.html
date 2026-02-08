@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=deepl2j">
+<link rel="manifest" href="./manifest.webmanifest?v=deepl2k">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
@@ -80,7 +80,7 @@ label.btn{gap:8px}
 .wlink:hover{border-bottom-color:rgba(96,165,250,.95)}
 
 /* ---- Fixed current line (always visible) ---- */
-body{ padding-top: 92px; } /* reserve space for fixed bar */
+body{ padding-top: 98px; } /* reserve space for fixed bar */
 .curFixedWrap{
   position:fixed;
   top: env(safe-area-inset-top, 0px);
@@ -94,7 +94,18 @@ body{ padding-top: 92px; } /* reserve space for fixed bar */
   background:rgba(11,14,20,.92);
   backdrop-filter: blur(10px);
   border:1px solid rgba(255,255,255,.14);
+  padding:10px 12px;
 }
+.curFixedLine{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  line-height:1.25;
+}
+.curFixedLine.en{ opacity:0.98; }
+.curFixedLine.jp{ opacity:0.90; margin-top:4px; }
+
+
 
 
 
@@ -106,8 +117,10 @@ body{ padding-top: 92px; } /* reserve space for fixed bar */
 
   <div id="curLineFixedWrap" class="curFixedWrap">
     <div class="curFixedInner">
-      <div id="curLineFixed" class="status curFixed">EN:
-JP:</div>
+      <div id="curLineFixed" class="status curFixed">
+  <div id="curLineFixedEN" class="curFixedLine en">EN: </div>
+  <div id="curLineFixedJP" class="curFixedLine jp">JP: </div>
+</div>
     </div>
   </div>
 

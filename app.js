@@ -46,6 +46,8 @@ const audioEl  = $("audio");
 const statusEl = $("status");
 const curLineEl = $("curLine");
 const curLineFixedEl = $("curLineFixed");
+const curLineFixedENEl = $("curLineFixedEN");
+const curLineFixedJPEl = $("curLineFixedJP");
 const chipTrack = $("chipTrack");
 
 const trackListEl = $("trackList");
@@ -77,10 +79,16 @@ let syncTimer = null;
 // ---------- UI helpers ----------
 function setStatus(t){ statusEl.textContent = String(t); }
 function setCur(en, jp){
-  const t = "EN: " + (en||"") + "
-JP: " + (jp||"");
-  curLineEl.textContent = t;
-  try{ if (curLineFixedEl) curLineFixedEl.textContent = t; }catch(e){}
+  const enTxt = "EN: " + (en||"");
+  const jpTxt = "JP: " + (jp||"");
+  curLineEl.textContent = enTxt + "
+" + jpTxt;
+  try{
+    if (curLineFixedENEl) curLineFixedENEl.textContent = enTxt;
+    if (curLineFixedJPEl) curLineFixedJPEl.textContent = jpTxt;
+    else if (curLineFixedEl) curLineFixedEl.textContent = enTxt + "
+" + jpTxt;
+  }catch(e){}
 }
 
 // ---------- filename matching ----------
