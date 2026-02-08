@@ -1,1 +1,4 @@
 /* unused */
+
+/* file input hidden but label clickable */
+.fileHidden{ position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
