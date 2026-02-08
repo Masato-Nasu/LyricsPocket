@@ -4,7 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0e14"/>
-<link rel="manifest" href="./manifest.webmanifest?v=deepl2u">
+<link rel="manifest" href="./manifest.webmanifest?v=deepl2h">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M8 21h16v3H8zM9 8h14v10H9z' fill='%2360a5fa'/%3E%3C/svg%3E">
 <title>LyricsPocket</title>
 <style>
 :root{
@@ -50,26 +51,6 @@ body{
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size:12px; white-space:pre-wrap; line-height:1.35;
 }
-
-/* ---- Current line: always visible (no auto-scroll) [deepl2u] ---- */
-#curLine {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: rgba(11,14,20,.92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  margin-top: 8px;
-  /* Clamp to exactly 2 lines (EN 1 line + JP 1 line). */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-/* Prevent browser scroll anchoring from "jumping" when content above changes */
-#panelLists, #panelLyrics, body {
-  overflow-anchor: none;
-}
 .list{border-top:1px solid var(--line)}
 .itemRow{
   display:flex; gap:10px; align-items:flex-start;
@@ -87,37 +68,47 @@ body{
 hr{border:none; border-top:1px solid var(--line); margin:10px 0}
 audio{width:100%}
 label.btn{gap:8px}
-</style>
 
+.wordChips{display:flex;flex-wrap:wrap;gap:8px}
+.wordChips .w{display:inline-flex;align-items:center;justify-content:center;padding:8px 10px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--text);font-weight:800;font-size:12px;cursor:pointer;user-select:none}
+.wordChips .w:active{transform:translateY(1px)}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(17,24,39,.92);
+  border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:999px;color:var(--text);font-weight:800;font-size:12px;z-index:9999}
+
+.wlink{cursor:pointer;border-bottom:1px dotted rgba(96,165,250,.55); padding-bottom:1px}
+.wlink:hover{border-bottom-color:rgba(96,165,250,.95)}
+
+</style>
 </head>
 <body>
 <div class="wrap">
-  <div class="h1">LyricsPocket (v1.3 NO-SW)</div>
-  <div class="small">Android/iPhone対応（iOSはフォルダ選択不可） / mp3,m4a + .lrc/.txt を端末から選択して再生・表示</div>
-<div class="small" style="margin-top:6px">※ 日本語訳はオンライン翻訳（MyMemory）を使用します。ネット必須。環境によってCORS/回数制限で失敗する場合があります（環境によって失敗する場合があります）。</div>
-
-  <div class="pane">
+  <div class="h1">LyricsPocket</div>
+<div class="pane">
     <div class="head">
-      <div class="row" style="flex:1">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1">
         <label for="inAudio" class="btn primary">AUDIOを選ぶ</label>
         <label for="inLyrics" class="btn">LYRICSを選ぶ</label>
-        <button id="btnPlay" class="btn ok">PLAY</button>
-        <button id="btnPrev" class="btn">PREV</button>
-        <button id="btnNext" class="btn">NEXT</button>
-        <button id="btnList" class="btn">LIST</button>
+        <button id="btnPlay" class="btn ok" type="button">PLAY</button>
+        <button id="btnPrev" class="btn" type="button">PREV</button>
+        <button id="btnNext" class="btn" type="button">NEXT</button>
+        <button id="btnList" class="btn" type="button">LIST</button>
         <button id="btnJP" class="pill on" type="button">JP: ON</button>
-</div>
+      </div>
     </div>
+
     <div class="body">
       <div id="chipTrack" class="pill off" style="display:inline-flex">TRACK: (未選択)</div>
       <div style="height:10px"></div>
       <audio id="audio" controls playsinline></audio>
-      <div id="audState" class="small" style="margin-top:8px">audio: (idle)</div>
       <div style="height:10px"></div>
       <div id="status" class="status">READY</div>
       <div style="height:10px"></div>
       <div id="curLine" class="status">EN:
 JP:</div>
+      <div style="height:10px"></div>
+      <div class="small">WORDS（タップでTANGO-CHOへ）</div>
+      <div id="wordChips" class="wordChips"></div>
     </div>
 
     <div id="panelLists" class="body">
@@ -132,17 +123,6 @@ JP:</div>
     <div id="panelLyrics" class="list"></div>
   </div>
 
-  <div class="pane">
-    <div class="head">
-      <div style="font-weight:700">SW / リセット</div>
-    </div>
-    <div class="body">
-      <a class="btn danger" href="#">SW & Cache を消す（白画面対策）</a>
-      <div class="small" style="margin-top:10px">※ 反映がおかしい／真っ白になる場合は、上のボタン→戻る→再読み込み。</div>
-
-    </div>
-  </div>
-
   <input id="inAudio" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg" multiple
          style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0" />
   <input id="inLyrics" type="file" accept=".lrc,.txt,text/plain" multiple
@@ -150,66 +130,169 @@ JP:</div>
 </div>
 
 <script>
+
+try{ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); } }catch(e){}
 "use strict";
-
 function $(id){ return document.getElementById(id); }
-var inAudio = $("inAudio");
-var inLyrics = $("inLyrics");
-var audioEl = $("audio");
-var statusEl = $("status");
-var audStateEl = $("audState");
-var curLineEl = $("curLine");
-var chipTrack = $("chipTrack");
-var trackListEl = $("trackList");
-var lyricListEl = $("lyricList");
-var panelLists = $("panelLists");
-var panelLyrics = $("panelLyrics");
-
-var btnPlay = $("btnPlay");
-var btnPrev = $("btnPrev");
-var btnNext = $("btnNext");
-var btnList = $("btnList");
-var btnJP = $("btnJP");
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
 
-var tracks = []; // {name, url, file}
-var trackIndex = -1;
+function decorateLyricHTML(text, lineIndex){
+  // Wrap each English-ish word in a clickable span to send to TANGO-CHO.
+  const s = String(text||"");
+  const reW = /[A-Za-z][A-Za-z'\-’]*/g;
+  let out = "";
+  let last = 0;
+  let mm;
+  while ((mm = reW.exec(s)) !== null){
+    const a = mm.index;
+    const b = a + mm[0].length;
+    out += esc(s.slice(last, a));
+    const w = mm[0];
+    out += '<span class="wlink" data-w="'+esc(w)+'" data-i="'+String(lineIndex)+'">'+esc(w)+'</span>';
+    last = b;
+  }
+  out += esc(s.slice(last));
+  return out;
+}
+const inAudio = $("inAudio");
+const inLyrics = $("inLyrics");
+const audioEl = $("audio");
+const statusEl = $("status");
+const curLineEl = $("curLine");
+const wordChipsEl = $("wordChips");
+const chipTrack = $("chipTrack");
+const trackListEl = $("trackList");
+const lyricListEl = $("lyricList");
+const panelLists = $("panelLists");
+const panelLyrics = $("panelLyrics");
 
-var lyricsMap = new Map(); // key -> {name,text,lines}
-var linkMap = loadLinkMap(); // trackKey -> lyricKey
+const btnPlay = $("btnPlay");
+const btnPrev = $("btnPrev");
+const btnNext = $("btnNext");
+const btnList = $("btnList");
+const btnJP = $("btnJP");
 
-var currentLines = []; // active lyric lines
-var currentLineIndex = -1;
-var jpOn = true;
-var listOn = true;
+let tracks = [];
+let albumSessionToken = 0; // increments when switching albums to ignore late async callbacks
+     // {name,url}
+let trackIndex = -1;
 
-function setAudState(){
+let lyricsMap = new Map();
+let lyricsLoaded = false;
+let lyricReaders = [];
+// key -> {name, lines:[{t,en,jp}]}
+let linkMap = loadLinkMap();
+
+let currentLines = [];
+let currentLineIndex = -1;
+let jpOn = true;
+let listOn = true;
+let syncTimer = null;
+
+function setStatus(t){ statusEl.textContent = String(t); }
+function setCur(en, jp){ curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + (jp||""); }
+
+const TANGO_CHO_URL = "https://masato-nasu.github.io/TANGO-CHO/"; // 連動先（必要なら変更）
+
+function toast(msg){
   try{
-    if (!audStateEl) return;
-    var rs = audioEl.readyState;
-    var ns = audioEl.networkState;
-    var dur = isFinite(audioEl.duration) ? audioEl.duration.toFixed(2) : "NaN";
-    var ct = isFinite(audioEl.currentTime) ? audioEl.currentTime.toFixed(2) : "NaN";
-    var src = audioEl && audioEl.src ? (audioEl.src.startsWith("blob:") ? "blob" : audioEl.src) : "(none)";
-    var err = audioEl.error ? ("errCode=" + audioEl.error.code) : "";
-    audStateEl.textContent = "audio: paused=" + audioEl.paused + " rs=" + rs + " ns=" + ns + " t=" + ct + "/" + dur + " src=" + src + " " + err;
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = String(msg);
+    document.body.appendChild(t);
+    setTimeout(()=>{ try{ t.remove(); }catch(e){} }, 1200);
   }catch(e){}
 }
 
-function setStatus(t){
-  statusEl.textContent = String(t);
-}
-function setCur(en, jp){
-  curLineEl.textContent = "EN: " + (en||"") + "\nJP: " + (jp||"");
+function extractWords(en){
+  const s = String(en||"");
+  const m = s.match(/[A-Za-z][A-Za-z'\-’]*/g);
+  if (!m) return [];
+  const out = [];
+  const seen = new Set();
+  for (const w0 of m){
+    const w = w0.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g,"");
+    if (!w) continue;
+    const key = w.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (w.length > 24) continue;
+    out.push(w);
+    if (out.length >= 80) break;
+  }
+  return out;
 }
 
-function baseName(name){
-  var n = String(name||"");
-  n = n.replace(/\.[^\.]+$/,"");
-  return n;
+function renderWordChips(en){
+  if (!wordChipsEl) return;
+  wordChipsEl.innerHTML = "";
+  const words = extractWords(en);
+  if (!words.length){
+    wordChipsEl.innerHTML = '<div class="small" style="opacity:.75">（英単語が見つかりません）</div>';
+    return;
+  }
+  for (const w of words){
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "w";
+    b.textContent = w;
+    b.dataset.w = w;
+    wordChipsEl.appendChild(b);
+  }
 }
+
+function pushInbox(word, example){
+  try{
+    const key = "TANGO_CHO_INBOX";
+    const raw = localStorage.getItem(key);
+    const arr = raw ? JSON.parse(raw) : [];
+    arr.unshift({word, example, src:"LyricsPocket", ts:Date.now()});
+    localStorage.setItem(key, JSON.stringify(arr.slice(0,200)));
+  }catch(e){}
+}
+
+function sendToTangoCho(word, example){
+  try{
+    const w = String(word||"").trim();
+    if (!w) return;
+    const ex = String(example||"").trim();
+    pushInbox(w, ex);
+
+    const u = new URL(TANGO_CHO_URL);
+    u.searchParams.set("word", w);
+    if (ex) u.searchParams.set("ex", ex);
+    u.searchParams.set("src", "lyricspocket");
+
+    const url = u.toString();
+    const payload = ex ? (w + "\n" + ex) : w;
+
+    // 1) まずコピー（失敗しても続行）
+    try{
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(payload).catch(()=>{});
+      }
+    }catch(e){}
+
+    // 2) Android等：共有シート優先（TANGO-CHOが受け取れる場合は“いつものTANGO-CHO”に入りやすい）
+    if (navigator.share){
+      navigator.share({ title:"TANGO-CHO", text: payload, url })
+        .then(()=>{ toast("SHARED"); })
+        .catch(()=>{ toast("COPIED（TANGO-CHOで貼り付け）"); });
+      return;
+    }
+
+    // 3) 共有が無い環境：勝手に開かず、コピーで渡す（別ストレージの“空TANGO-CHO”を開く事故を防ぐ）
+    toast("COPIED（TANGO-CHOで貼り付け）");
+    // 必要ならユーザーが自分でTANGO-CHOを開く
+  }catch(e){
+    toast("SEND FAILED");
+  }
+}
+
+
 function normalizeKey(name){
-  var s = String(name||"").toLowerCase();
+  let s = String(name||"").toLowerCase();
   s = s.replace(/\.[^\.]+$/,"");
   s = s.replace(/\(.*?\)|\[.*?\]|\{.*?\}/g," ");
   s = s.replace(/\b(remaster(ed)?|mono|stereo|live|demo|version|edit|mix|feat\.?|ft\.?|official|audio|lyrics?)\b/g," ");
@@ -218,80 +301,128 @@ function normalizeKey(name){
   return s;
 }
 
-
-  // direct MyMemory
-  var url2 = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(q) + "&langpair=en|ja";
-  return fetch(url2);
-}
-
 function loadLinkMap(){
   try{
-    var raw = localStorage.getItem("lp_link_map_stable");
+    const raw = localStorage.getItem("lp_link_map_v13");
     if (!raw) return new Map();
-    var obj = JSON.parse(raw);
+    const obj = JSON.parse(raw);
     return new Map(Object.entries(obj||{}));
   }catch(e){ return new Map(); }
 }
 function saveLinkMap(){
   try{
-    var obj = Object.fromEntries(linkMap.entries());
-    localStorage.setItem("lp_link_map_stable", JSON.stringify(obj));
+    localStorage.setItem("lp_link_map_v13", JSON.stringify(Object.fromEntries(linkMap.entries())));
   }catch(e){}
 }
 
 function clearTracks(){
-  for (var i=0;i<tracks.length;i++){
-    try{ URL.revokeObjectURL(tracks[i].url); }catch(e){}
-  }
+  for (const t of tracks){ try{ URL.revokeObjectURL(t.url); }catch(e){} }
   tracks = [];
   trackIndex = -1;
 }
 
+
+function lpClearLyrics(){
+  try{ lyricsMap = new Map(); }catch(e){}
+  try{ lyricsLoaded = false; }catch(e){}
+  try{ currentLines = []; currentLineIndex = -1; }catch(e){}
+  try{
+    // clear visible panels (names may differ across builds)
+    if (typeof panelLyrics !== "undefined" && panelLyrics) panelLyrics.innerHTML = "";
+  }catch(e){}
+  try{
+    if (typeof lyricListEl !== "undefined" && lyricListEl) lyricListEl.innerHTML = "";
+    if (typeof panelLyricList !== "undefined" && panelLyricList) panelLyricList.innerHTML = "";
+  }catch(e){}
+  try{ setCur("",""); }catch(e){}
+  try{ renderWordChips(""); }catch(e){}
+}
+
+function lpAbortLyricReaders(){
+  try{ for (const r of lyricReaders){ try{ r.abort(); }catch(e){} } }catch(e){}
+  lyricReaders = [];
+}
+
+function lpAlbumLyricReset(msg){
+  // invalidate late lyric loads from previous album
+  albumSessionToken++;
+  lpAbortLyricReaders();
+  lpClearLyrics();
+  try{ inLyrics.value = ""; }catch(e){}
+  try{ linkMap = new Map(); localStorage.removeItem("lp_link_map_v13"); }catch(e){}
+  if (msg) setStatus(msg);
+}
+
 function parseLRC(text){
-  // returns [{t:number|null, en:string, jp:string|null}]
-  var s = String(text || "");
+  // Robust LRC parser:
+  // - strips UTF-8 BOM
+  // - ignores [ti:], [ar:], [al:], [by:], [offset:] etc.
+  // - applies [offset:ms]
+  // - ignores speaker tags like [Shara Nelson]
+  // - if timed LRC is present, drops untimed bracket lines to keep sync stable
+  let s = String(text||"");
+  s = s.replace(/^\uFEFF/, ""); // BOM
   s = s.replace(/\r/g, "");
-  var lines = s.split("\n");
-  var out = [];
-  var hasTime = false;
+  const rawLines = s.split("\n");
 
-  for (var i = 0; i < lines.length; i++){
-    var line = lines[i];
-    if (!line) continue;
+  const out = [];
+  let hasTime = false;
+  let offsetMs = 0;
 
-    // metadata tags: [ar:...], [ti:...], [by:...], [offset:...]
-    if (/^\[[a-z]{1,8}:/i.test(line.trim())) continue;
+  const timeRe = /\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/g;
 
-    // time tags: [mm:ss], [mm:ss.xx], [mm:ss,xx]
-    var tags = line.match(/\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/g);
+  for (let line0 of rawLines){
+    let line = String(line0||"").trimEnd();
+    if (!line.trim()) continue;
+
+    // strip BOM if it appears mid-file
+    line = line.replace(/^\uFEFF/, "");
+
+    // [offset:500]
+    const mo = /^\[\s*offset\s*:\s*(-?\d+)\s*\]\s*$/i.exec(line.trim());
+    if (mo){
+      offsetMs = parseInt(mo[1],10) || 0;
+      continue;
+    }
+
+    // metadata like [ti:...], [ar:...], [by:...]
+    if (/^\[\s*[a-z]{1,12}\s*:\s*.*\]\s*$/i.test(line.trim())) continue;
+
+    // speaker / bracket tags with no time (e.g. [Shara Nelson])
+    timeRe.lastIndex = 0;
+    if (/^\[[^\]]+\]\s*$/.test(line.trim()) && !timeRe.test(line)){
+      timeRe.lastIndex = 0;
+      continue;
+    }
+    timeRe.lastIndex = 0;
+
+    const tags = line.match(timeRe);
     if (tags && tags.length){
       hasTime = true;
-      var plain = line.replace(/\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/g, "").trim();
+      const plain = line.replace(timeRe, "").trim();
       if (!plain) continue;
 
-      for (var j = 0; j < tags.length; j++){
-        var mm = /\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/.exec(tags[j]);
+      for (const tg of tags){
+        const mm = /\[(\d{1,3}):(\d{2})(?:[\.,](\d{1,3}))?\]/.exec(tg);
         if (!mm) continue;
-        var min = parseInt(mm[1], 10) || 0;
-        var sec = parseInt(mm[2], 10) || 0;
-        var frac = mm[3] ? String(mm[3]) : "";
-        var ms = 0;
-        if (frac){
-          // normalize to 3 digits
-          ms = parseInt((frac + "00").slice(0, 3), 10) || 0;
-        }
-        var t = (min * 60) + sec + (ms / 1000);
-        out.push({ t: t, en: plain, jp: null });
+        const min = parseInt(mm[1],10)||0;
+        const sec = parseInt(mm[2],10)||0;
+        const frac = mm[3] ? String(mm[3]) : "";
+        let ms = 0;
+        if (frac) ms = parseInt((frac+"00").slice(0,3),10)||0;
+        let t = (min*60)+sec+(ms/1000)+(offsetMs/1000);
+        if (t < 0) t = 0;
+        out.push({t, en:plain, jp:null});
       }
-    } else {
-      var p = line.trim();
-      if (!p) continue;
-      out.push({ t: null, en: p, jp: null });
+    }else{
+      out.push({t:null, en:line.trim(), jp:null});
     }
   }
 
   if (hasTime){
-    out.sort(function(a, b){ return (a.t || 0) - (b.t || 0); });
+    const timed = out.filter(x => x.t !== null);
+    timed.sort((a,b)=>a.t-b.t);
+    return timed;
   }
   return out;
 }
@@ -302,150 +433,74 @@ function renderTrackList(){
     trackListEl.innerHTML = '<div class="itemRow"><div class="t" style="opacity:.75">AUDIOを選ぶ で曲を選択してください。</div></div>';
     return;
   }
-  for (var i=0;i<tracks.length;i++){
-    var t = tracks[i];
-    var lab = document.createElement("label");
+  for (let i=0;i<tracks.length;i++){
+    const t = tracks[i];
+    const lab = document.createElement("label");
     lab.className = "itemRow" + (i===trackIndex ? " current":"");
-    var safeName = escapeHTML(t.name);
-    lab.innerHTML = '<input type="radio" name="trk" value="'+i+'" '+(i===trackIndex?'checked':'')+'>' +
-                    '<div><div class="t">'+safeName+'</div><div class="sub">'+(i+1)+' / '+tracks.length+'</div></div>';
+    lab.innerHTML =
+      '<input type="radio" name="trk" value="'+i+'" '+(i===trackIndex?'checked':'')+'>' +
+      '<div><div class="t">'+esc(t.name)+'</div><div class="sub">'+(i+1)+' / '+tracks.length+'</div></div>';
     trackListEl.appendChild(lab);
   }
 }
 
 function renderLyricList(){
   lyricListEl.innerHTML = "";
-  var keys = Array.from(lyricsMap.keys());
+  const keys = Array.from(lyricsMap.keys());
   if (!keys.length){
     lyricListEl.innerHTML = '<div class="itemRow"><div class="t" style="opacity:.75">LYRICSを選ぶ で .lrc/.txt を選択してください。</div></div>';
     return;
   }
-  for (var i=0;i<keys.length;i++){
-    var k = keys[i];
-    var info = lyricsMap.get(k);
-    var lab = document.createElement("label");
+  for (const k of keys){
+    const info = lyricsMap.get(k);
+    const lab = document.createElement("label");
     lab.className = "itemRow";
-    lab.innerHTML = '<input type="radio" name="lyr" value="'+escapeHTML(k)+'">' +
-                    '<div><div class="t">'+escapeHTML(info.name)+'</div><div class="sub">'+k+'</div></div>';
+    lab.innerHTML =
+      '<input type="radio" name="lyr" value="'+esc(k)+'">' +
+      '<div><div class="t">'+esc(info.name)+'</div><div class="sub">'+esc(k)+'</div></div>';
     lyricListEl.appendChild(lab);
   }
 }
 
-function selectTrack(i){
-  if (!(i>=0 && i<tracks.length)) return;
-  trackIndex = i;
-  var tr = tracks[i];
-  chipTrack.textContent = "TRACK: " + tr.name;
-  chipTrack.className = "pill on";
-  // auto link lyric if exists
-  autoPickLyricsForTrack(tr.name);
-  // set audio source but do not autoplay
-  audioEl.src = tr.url;
-  try{ audioEl.preload = "auto"; }catch(e){}
-  audioEl.load();
-  setAudState();
-  renderTrackList();
-  setStatus("TRACK READY: " + tr.name);
-}
-
-function autoPickLyricsForTrack(trackName){
-  var tkey = normalizeKey(trackName);
-  var linked = linkMap.get(tkey);
-  if (linked && lyricsMap.has(linked)){
-    loadLyricsKey(linked);
-    return;
-  }
-  // exact base name
-  var b = baseName(trackName);
-  var bkey = normalizeKey(b);
-  var bestKey = null;
-  var bestScore = -1;
-  lyricsMap.forEach(function(val,key){
-    var lk = normalizeKey(val.name);
-    if (lk === bkey){ bestKey = key; bestScore = 999; return; }
-    // partial overlap
-    var score = 0;
-    if (lk && bkey){
-      if (lk.indexOf(bkey)>=0 || bkey.indexOf(lk)>=0) score = Math.min(lk.length,bkey.length);
-    }
-    if (score > bestScore){
-      bestScore = score;
-      bestKey = key;
-    }
-  });
-  if (bestKey){
-    // save mapping for next time
-    linkMap.set(tkey, bestKey);
-    saveLinkMap();
-    loadLyricsKey(bestKey);
-  }else{
-    currentLines = [];
-    currentLineIndex = -1;
-    renderLyricsLines();
-    setStatus("LYRICS: NO MATCH (下のLYRICSから選んでください)");
-  }
-}
-
-function loadLyricsKey(key){
-  var info = lyricsMap.get(key);
-  if (!info) return;
-  currentLines = info.lines;
-  currentLineIndex = -1;
-  renderLyricsLines();
-  setStatus("LYRICS LOADED: " + info.name + " (" + currentLines.length + " lines)");
-  if (currentLines.length && currentLines[0].t !== null){ setStatus("SYNC: ON (timecoded LRC)"); startSync(); }
-  else { setStatus("SYNC: OFF (no timestamps)"); }
-  // if no timestamp lyrics, show first line and translate it
-  if (currentLines.length && currentLines[0].t === null){
-    currentLineIndex = 0;
-    highlightLine(0);
-    maybeTranslateLine(0);
-  }
-}
-
-function escapeHTML(s){
-  return String(s).replace(/[&<>"']/g, function(c){
-    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);
-  });
-}
-
-function renderLyricsLines(){
+function renderLyrics(){
   panelLyrics.innerHTML = "";
   if (!currentLines.length){
     panelLyrics.innerHTML = '<div class="lyLine"><div class="en" style="opacity:.75">歌詞がありません。LYRICSを選ぶ で .lrc/.txt を読み込むか、下のLYRICSから選択してください。</div></div>';
-    setCur("",""); 
+    setCur("","");
+renderWordChips("");
+  try{ if (typeof chipLyric!=="undefined" && chipLyric){ chipLyric.textContent="LYRICS: (未選択)"; chipLyric.className="pill off"; } }catch(e){}
+  // clear lyrics picker so selecting same files again triggers change
+  try{ inLyrics.value = ""; }catch(e){}
     return;
   }
-  for (var i=0;i<currentLines.length;i++){
-    var ln = currentLines[i];
-    var div = document.createElement("div");
+  for (let i=0;i<currentLines.length;i++){
+    const ln = currentLines[i];
+    const div = document.createElement("div");
     div.className = "lyLine" + (i===currentLineIndex ? " current":"");
     div.dataset.i = String(i);
-    div.innerHTML = '<div class="en">'+escapeHTML(ln.en)+'</div>' +
-                    '<div class="jp">'+escapeHTML(ln.jp || "")+'</div>';
+    div.innerHTML =
+      '<div class="en">'+decorateLyricHTML(ln.en, i)+'</div>' +'<div class="jp">'+(jpOn ? esc(ln.jp||"") : "")+'</div>';
     panelLyrics.appendChild(div);
   }
 }
 
 function highlightLine(i){
   currentLineIndex = i;
-  var nodes = panelLyrics.querySelectorAll(".lyLine");
-  for (var k=0;k<nodes.length;k++){
-    nodes[k].classList.toggle("current", k===i);
-    var jp = nodes[k].querySelector(".jp");
-    if (jp && !jpOn) jp.textContent = "";
-    if (jp && jpOn) jp.textContent = currentLines[k].jp || "";
-  }
-  var ln = currentLines[i];
-  setCur(ln.en, ln.jp || "");
-  // auto-follow disabled (user scrolls manually)
+  const nodes = panelLyrics.querySelectorAll(".lyLine");
+  nodes.forEach((n,idx)=>{
+    n.classList.toggle("current", idx===i);
+    const jp = n.querySelector(".jp");
+    if (jp) jp.textContent = jpOn ? (currentLines[idx].jp||"") : "";
+  });
+  const ln = currentLines[i];
+  setCur(ln.en, jpOn ? (ln.jp||"") : "");
+  renderWordChips(ln.en);
 }
 
 function findLineIndexByTime(t){
-  // assumes sorted by t
-  var last = -1;
-  for (var i=0;i<currentLines.length;i++){
-    var lt = currentLines[i].t;
+  let last = -1;
+  for (let i=0;i<currentLines.length;i++){
+    const lt = currentLines[i].t;
     if (lt === null) return -1;
     if (lt <= t) last = i;
     else break;
@@ -453,237 +508,19 @@ function findLineIndexByTime(t){
   return last;
 }
 
-function maybeTranslateLine(i){
-  if (!jpOn) return;
-  if (!(i>=0 && i<currentLines.length)) return;
-  var ln = currentLines[i];
-  if (!ln.en) return;
-  if (ln.jp) return;
-  var q = ln.en.trim();
-  if (!q) return;
-
-  setStatus("TRANSLATING...");
-  fetch("https://api.mymemory.translated.net/get?q="+encodeURIComponent(q)+"&langpair=en|ja")
-    .then(function(r){
-      var code = r && typeof r.status==="number" ? r.status : 0;
-      if (!r || !r.ok) throw new Error("HTTP " + String(code));
-      return r.json().then(function(j){ return {code:code, j:j}; });
-    })
-    .then(function(pack){
-      var code = pack.code;
-      var j = pack.j;
-      var txt = "";
-      try{
-        if (j && j.responseData && typeof j.responseData.translatedText === "string") txt = j.responseData.translatedText;
-      }catch(e){}
-      txt = String(txt||"").trim();
-      if (!txt) txt = "（翻訳が空でした）";
-      ln.jp = txt;
-
-      var el = panelLyrics.querySelector('.lyLine[data-i="'+i+'"] .jp');
-      if (el && jpOn) el.textContent = ln.jp || "";
-      setCur(ln.en, ln.jp || "");
-      setStatus("OK (" + String(code) + ")");
-    })
-    .catch(function(err){
-      ln.jp = "（翻訳失敗：ネット/CORS/制限の可能性）";
-      var el = panelLyrics.querySelector('.lyLine[data-i="'+i+'"] .jp');
-      if (el && jpOn) el.textContent = ln.jp || "";
-      setCur(ln.en, ln.jp || "");
-      setStatus("TRANSLATE FAILED: " + String(err||""));
-    });
-}
-
-function toggleJP(){
-  jpOn = !jpOn;
-  btnJP.textContent = "JP: " + (jpOn ? "ON" : "OFF");
-  btnJP.className = "pill " + (jpOn ? "on" : "off");
-  if (!currentLines.length) return;
-  // refresh current
-  if (currentLineIndex>=0) highlightLine(currentLineIndex);
-}
-
-
-      setStatus("TEST OK: " + (txt || "(empty)"));
-    })
-    .catch(function(err){
-      setStatus("TEST FAILED: " + String(err || "") + " (CORS/ネットの可能性)");
-    });
-}
-
-function toggleList(){
-  listOn = !listOn;
-  panelLists.classList.toggle("hidden", !listOn);
-}
-
-inAudio.addEventListener("change", function(){
-  try{
-    clearTracks();
-    var files = Array.from(inAudio.files || []);
-    files = files.filter(function(f){
-      var n = (f.name||"").toLowerCase();
-      return /\.(mp3|m4a|aac|wav|flac|ogg)$/i.test(n);
-    });
-    for (var i=0;i<files.length;i++){
-      var f = files[i];
-      var url = URL.createObjectURL(f);
-      tracks.push({name:f.name, url:url, file:f});
-    }
-    setStatus("AUDIO LOADED: " + tracks.length);
-    renderTrackList();
-    if (tracks.length){
-      selectTrack(0);
-    }
-  }catch(e){
-    setStatus("AUDIO ERROR: " + String(e));
-  }finally{
-    // allow selecting same file again
-    inAudio.value = "";
-  }
-});
-
-inLyrics.addEventListener("change", function(){
-  var files = Array.from(inLyrics.files || []);
-  if (!files.length){ inLyrics.value=""; return; }
-  var left = files.length;
-  setStatus("LYRICS LOADING...");
-  files.forEach(function(f){
-    var reader = new FileReader();
-    reader.onload = function(){
-      try{
-        var text = String(reader.result||"");
-        var key = normalizeKey(f.name);
-        var lines = parseLRC(text);
-        lyricsMap.set(key, {name:f.name, text:text, lines:lines});
-      }catch(e){}
-      left--;
-      if (left<=0){
-        setStatus("LYRICS READY: " + lyricsMap.size);
-        renderLyricList();
-
-        // if track selected, try auto pick
-        if (trackIndex>=0 && tracks[trackIndex]){
-          autoPickLyricsForTrack(tracks[trackIndex].name);
-        }
-      }
-    };
-    reader.onerror = function(){
-      left--;
-      if (left<=0){
-        setStatus("LYRICS READY: " + lyricsMap.size);
-        renderLyricList();
-
-      }
-    };
-    reader.readAsText(f);
-  });
-  inLyrics.value = "";
-});
-
-// Track selection (radio)
-trackListEl.addEventListener("change", function(e){
-  var t = e.target;
-  if (!t || t.name!=="trk") return;
-  var i = parseInt(t.value,10);
-  if (!isFinite(i)) return;
-  selectTrack(i);
-});
-
-// Lyric selection (radio): save mapping and load
-lyricListEl.addEventListener("change", function(e){
-  var t = e.target;
-  if (!t || t.name!=="lyr") return;
-  var key = String(t.value||"");
-  if (!lyricsMap.has(key)) return;
-  if (trackIndex>=0 && tracks[trackIndex]){
-    linkMap.set(normalizeKey(tracks[trackIndex].name), key);
-    saveLinkMap();
-  }
-  loadLyricsKey(key);
-});
-
-// Tap line to translate
-panelLyrics.addEventListener("click", function(e){
-  var el = e.target;
-  var row = el && el.closest ? el.closest(".lyLine") : null;
-  if (!row) return;
-  var i = parseInt(row.dataset.i,10);
-  if (!isFinite(i)) return;
-  highlightLine(i);
-  maybeTranslateLine(i);
-});
-
-btnPlay.addEventListener("click", function(){
-  if (trackIndex<0 && tracks.length) selectTrack(0);
-  if (!audioEl.src){
-    setStatus("NO TRACK");
-    return;
-  }
-  try{ audioEl.muted = false; audioEl.volume = 1; }catch(e){}
-audioEl.play().then(function(){
-    setStatus("PLAYING");
-    setAudState();
-    startSync();
-  }).catch(function(err){
-    var n = (err && err.name) ? err.name : String(err||"");
-    setAudState();
-    if (n === "NotAllowedError") setStatus("PLAY BLOCKED: ①もう一度PLAY ②下のaudio▶︎を直接押す");
-    else if (n === "NotSupportedError") setStatus("PLAY FAILED: NotSupported (形式非対応の可能性。mp3推奨)");
-    else setStatus("PLAY FAILED: " + n);
-  });
-});
-
-btnPrev.addEventListener("click", function(){
-  if (!tracks.length) return;
-  var i = trackIndex<=0 ? tracks.length-1 : trackIndex-1;
-  selectTrack(i);
-});
-
-btnNext.addEventListener("click", function(){
-  if (!tracks.length) return;
-  var i = (trackIndex>=tracks.length-1) ? 0 : trackIndex+1;
-  selectTrack(i);
-});
-
-btnList.addEventListener("click", toggleList);
-
-// audio diagnostics
-audioEl.addEventListener("loadedmetadata", setAudState);
-audioEl.addEventListener("canplay", setAudState);
-audioEl.addEventListener("playing", setAudState);
-audioEl.addEventListener("pause", setAudState);
-audioEl.addEventListener("stalled", setAudState);
-audioEl.addEventListener("waiting", setAudState);
-audioEl.addEventListener("error", function(){
-  setAudState();
-  try{
-    var c = audioEl.error ? audioEl.error.code : 0;
-    setStatus("AUDIO ERROR code=" + String(c));
-  }catch(e){}
-});
-
-btnJP.addEventListener("click", toggleJP);
-// removed
-
-
-
-// follow lyrics with time (poller: more reliable than timeupdate on some Android/PWA)
-var syncTimer = null;
-
 function syncTick(){
   try{
     if (!currentLines.length) return;
-    if (!currentLines[0] || currentLines[0].t === null) return; // no timecodes
-    if (!audioEl || audioEl.paused) return;
-    var t = audioEl.currentTime || 0;
-    var idx2 = findLineIndexByTime(t);
-    if (idx2 >= 0 && idx2 !== currentLineIndex){
-      highlightLine(idx2);
-      maybeTranslateLine(idx2);
+    if (currentLines[0].t === null) return;
+    if (audioEl.paused) return;
+    const t = audioEl.currentTime || 0;
+    const idx = findLineIndexByTime(t);
+    if (idx >= 0 && idx !== currentLineIndex){
+      highlightLine(idx);
+      maybeTranslateLine(idx);
     }
   }catch(e){}
 }
-
 function startSync(){
   if (syncTimer) return;
   syncTimer = setInterval(syncTick, 180);
@@ -694,13 +531,394 @@ function stopSync(){
   syncTimer = null;
 }
 
+function selectTrack(i){
+  // If lyrics are not loaded for this album, never keep old lyrics visible
+  if (!lyricsLoaded){ try{ clearLyrics(); }catch(e){} }
+  if (!(i>=0 && i<tracks.length)) return;
+  trackIndex = i;
+  const tr = tracks[i];
+  chipTrack.textContent = "TRACK: " + tr.name;
+  chipTrack.className = "pill on";
+
+  // auto-pick lyrics
+  autoPickLyrics(tr.name);
+
+  audioEl.src = tr.url;
+  try{ audioEl.preload = "auto"; }catch(e){}
+  audioEl.load();
+
+  renderTrackList();
+  setStatus("TRACK READY: " + tr.name);
+}
+
+function autoPickLyrics(trackName){
+  const tkey = normalizeKey(trackName);
+  const linked = linkMap.get(tkey);
+  if (linked && lyricsMap.has(linked)){
+    loadLyricsKey(linked);
+    return;
+  }
+  const bkey = normalizeKey(trackName);
+  let bestKey = null;
+  let bestScore = -1;
+  lyricsMap.forEach((info,key)=>{
+    const lk = normalizeKey(info.name);
+    let score = 0;
+    if (lk === bkey) score = 999;
+    else if (lk && bkey && (lk.includes(bkey) || bkey.includes(lk))) score = Math.min(lk.length,bkey.length);
+    if (score > bestScore){ bestScore = score; bestKey = key; }
+  });
+  if (bestKey){
+    linkMap.set(tkey, bestKey);
+    saveLinkMap();
+    loadLyricsKey(bestKey);
+  }else{
+    currentLines = [];
+    currentLineIndex = -1;
+    renderLyrics();
+    setStatus("LYRICS: NO MATCH（下のLYRICSから選んでください）");
+  }
+}
+
+function loadLyricsKey(key){
+  const tok = albumSessionToken;
+  const info = lyricsMap.get(key);
+  if (!info) return;
+  if (tok !== albumSessionToken) return;
+  lyricsLoaded = true;
+
+  currentLines = info.lines;
+  currentLineIndex = -1;
+  renderLyrics();
+
+  if (currentLines.length && currentLines[0].t !== null){
+    setStatus("LYRICS LOADED / SYNC: ON");
+    startSync();
+  }else{
+    setStatus("LYRICS LOADED / SYNC: OFF");
+    if (currentLines.length){
+      highlightLine(0);
+      maybeTranslateLine(0);
+    }
+  }
+}
+
+// Translation endpoint
+// Uses MyMemory via Cloudflare Worker proxy (recommended to avoid CORS).
+const MYMEMORY_BASE = "https://api.mymemory.translated.net/get";
+const TRANSLATE_PROXY_BASE = "https://lyricspocket-translate.1bitexist.workers.dev/get"; // set "" to disable proxy
+
+function buildTranslateURL(q){
+  const base = (TRANSLATE_PROXY_BASE && TRANSLATE_PROXY_BASE.trim()) ? TRANSLATE_PROXY_BASE.trim() : MYMEMORY_BASE;
+  return base + "?q=" + encodeURIComponent(q) + "&langpair=en|ja";
+}
+
+function openGoogleTranslate(text){
+  const t = String(text||"").trim();
+  if (!t) return;
+  const u = "https://translate.google.com/?sl=en&tl=ja&text=" + encodeURIComponent(t) + "&op=translate";
+  try{ window.open(u, "_blank"); }catch(e){ location.href = u; }
+}
+
+function maybeTranslateLine(i){
+  const tok = albumSessionToken;
+  if (!jpOn) return;
+  if (!(i>=0 && i<currentLines.length)) return;
+  const ln = currentLines[i];
+
+  // If we already have a real translation, skip.
+  // If ln._jpFallback is set, allow retry (quota may reset later).
+  if (!ln || !ln.en || (ln.jp && !ln._jpFallback)) return;
+
+  const q = ln.en.trim();
+  if (!q) return;
+
+  setStatus("TRANSLATING...");
+  const url = buildTranslateURL(q);
+
+  fetch(url)
+    .then(async (r)=>{
+      const data = await r.json().catch(()=>({}));
+      data._httpStatus = r.status;
+      return data;
+    })
+    .then((data)=>{
+      const status = (typeof data.responseStatus === "number") ? data.responseStatus : (data._httpStatus || 200);
+      const details = data && data.responseDetails ? String(data.responseDetails) : "";
+      const tt = data && data.responseData ? String(data.responseData.translatedText||"") : "";
+
+      // quota / rate limit
+      if (status === 429 || /USED ALL AVAILABLE FREE TRANSLATIONS/i.test(details) || /quota/i.test(details)){
+        if (tok !== albumSessionToken) return;
+      ln.jp = "（翻訳制限中：タップでGoogle翻訳）";
+        ln._jpFallback = "google";
+        renderLyrics();
+        setCur(ln.en, ln.jp);
+        setStatus("TRANSLATE LIMITED (429)");
+        return;
+      }
+
+      const txt = tt.trim();
+      if (txt){
+        ln.jp = txt;
+        ln._jpFallback = "";
+        const el = panelLyrics.querySelector('.lyLine[data-i="'+i+'"] .jp');
+        if (el && jpOn) el.textContent = ln.jp;
+        setCur(ln.en, ln.jp);
+        setStatus("OK");
+        return;
+      }
+
+      if (tok !== albumSessionToken) return;
+      ln.jp = "（翻訳失敗：タップでGoogle翻訳）";
+      ln._jpFallback = "google";
+      renderLyrics();
+      setCur(ln.en, ln.jp);
+      setStatus("TRANSLATE FAILED");
+    })
+    .catch(()=>{
+      if (tok !== albumSessionToken) return;
+      ln.jp = "（翻訳失敗：タップでGoogle翻訳）";
+      ln._jpFallback = "google";
+      renderLyrics();
+      setCur(ln.en, ln.jp);
+      setStatus("TRANSLATE FAILED");
+    });
+}
+
+// ----- events -----
+inAudio.addEventListener("change", ()=>{
+  const tok = albumSessionToken;
+try{
+    // Album overwrite or re-pick: clear old state first
+    try{ if (typeof resetAlbumSession === "function") resetAlbumSession("ALBUM RESET (AUDIO)"); }catch(e){}
+    clearTracks();
+    try{ lyricsLoaded = false; }catch(e){}
+
+    let files = Array.from(inAudio.files || []);
+    if (!files.length){
+      setStatus("AUDIO: CANCELLED");
+      return;
+    }
+
+    files = files.filter(f=>{
+      const n = (f.name||"").toLowerCase();
+      const t = (f.type||"").toLowerCase();
+      if (t && t.startsWith("audio/")) return true;
+      return /\.(mp3|m4a|aac|wav|flac|ogg|mp4|m4p)$/i.test(n);
+    });
+
+    if (!files.length){
+      setStatus("AUDIO: NO SUPPORTED FILES (mp3/m4a推奨)");
+      return;
+    }
+
+    let added = 0;
+    for (const f of files){
+      try{
+        const url = URL.createObjectURL(f);
+        tracks.push({name:f.name, url:url});
+        added++;
+      }catch(err){
+        // keep going
+      }
+    }
+
+    if (!added){
+      setStatus("AUDIO ERROR: createObjectURL failed");
+      return;
+    }
+
+    setStatus("AUDIO LOADED: " + tracks.length);
+    renderTrackList();
+    if (tracks.length) selectTrack(0);
+  }catch(e){
+    // Show actual error so we can diagnose
+    const msg = (e && (e.message || e.name)) ? (e.message || e.name) : String(e||"");
+    setStatus("AUDIO ERROR: " + msg);
+  }finally{
+    // allow re-selecting the same files next time
+    try{ inAudio.value = ""; }catch(e){}
+  }
+});
+
+inLyrics.addEventListener("change", ()=>{
+  const tok = albumSessionToken;
+  lpAbortLyricReaders();
+  lpClearLyrics();
+
+const files = Array.from(inLyrics.files || []);
+  if (!files.length){ inLyrics.value=""; return; }
+  let left = files.length;
+  setStatus("LYRICS LOADING...");
+  files.forEach(f=>{
+    const reader = new FileReader();
+    lyricReaders.push(reader);
+    reader.onload = ()=>{
+      if (tok !== albumSessionToken) return;
+      try{
+        const text = String(reader.result||"");
+        const key = normalizeKey(f.name);
+        lyricsMap.set(key, {name:f.name, lines:parseLRC(text)});
+      }catch(e){}
+      left--;
+      if (left<=0){
+        lyricsLoaded = true;
+        setStatus("LYRICS READY: " + lyricsMap.size);
+        renderLyricList();
+        if (trackIndex>=0 && tracks[trackIndex]) autoPickLyrics(tracks[trackIndex].name);
+      }
+    };
+    reader.onerror = ()=>{
+      if (tok !== albumSessionToken) return;
+      left--;
+      if (left<=0){
+        lyricsLoaded = true;
+        setStatus("LYRICS READY: " + lyricsMap.size);
+        renderLyricList();
+      }
+    };
+    reader.readAsText(f);
+  });
+  inLyrics.value = "";
+});
+
+trackListEl.addEventListener("change", (e)=>{
+  const t = e.target;
+  if (!t || t.name!=="trk") return;
+  const i = parseInt(t.value,10);
+  if (!isFinite(i)) return;
+  selectTrack(i);
+});
+
+lyricListEl.addEventListener("change", (e)=>{
+  const t = e.target;
+  if (!t || t.name!=="lyr") return;
+  const key = String(t.value||"");
+  if (!lyricsMap.has(key)) return;
+
+  if (trackIndex>=0 && tracks[trackIndex]){
+    linkMap.set(normalizeKey(tracks[trackIndex].name), key);
+    saveLinkMap();
+  }
+  loadLyricsKey(key);
+});
+
+panelLyrics.addEventListener("click", (e)=>{
+    const t = e.target;
+
+  // JP fallback click → open Google Translate
+  if (t && t.classList && t.classList.contains("jp")){
+    const rowJ = t.closest ? t.closest(".lyLine") : null;
+    if (rowJ){
+      const ji = parseInt(rowJ.dataset.i,10);
+      if (isFinite(ji) && currentLines[ji] && currentLines[ji]._jpFallback === "google"){
+        openGoogleTranslate(currentLines[ji].en);
+        return;
+      }
+    }
+  }
+  // WORD click → send to TANGO-CHO
+  if (t && t.classList && t.classList.contains("wlink")){
+    const w = t.dataset ? t.dataset.w : "";
+    const li = t.dataset ? parseInt(t.dataset.i,10) : -1;
+    const ex = (li>=0 && currentLines[li]) ? currentLines[li].en : ((currentLineIndex>=0 && currentLines[currentLineIndex]) ? currentLines[currentLineIndex].en : "");
+    toast("SEND → TANGO-CHO: " + w);
+    sendToTangoCho(w, ex);
+    return;
+  }
+  const row = e.target && e.target.closest ? e.target.closest(".lyLine") : null;
+  if (!row) return;
+  const i = parseInt(row.dataset.i,10);
+  if (!isFinite(i)) return;
+  highlightLine(i);
+  maybeTranslateLine(i);
+});
+
+btnPlay.addEventListener("click", ()=>{
+  if (trackIndex<0 && tracks.length) selectTrack(0);
+  if (!audioEl.src){ setStatus("NO TRACK"); return; }
+  try{ audioEl.muted=false; audioEl.volume=1; }catch(e){}
+  audioEl.play().then(()=>{
+    setStatus("PLAYING");
+    startSync();
+  }).catch((err)=>{
+    const n = (err && err.name) ? err.name : String(err||"");
+    if (n === "NotAllowedError") setStatus("PLAY BLOCKED（もう一度PLAY / audio▶︎を直接押す）");
+    else if (n === "NotSupportedError") setStatus("PLAY FAILED（形式非対応の可能性。mp3推奨）");
+    else setStatus("PLAY FAILED: " + n);
+  });
+});
+
+btnPrev.addEventListener("click", ()=>{
+  if (!tracks.length) return;
+  selectTrack(trackIndex<=0 ? tracks.length-1 : trackIndex-1);
+});
+btnNext.addEventListener("click", ()=>{
+  if (!tracks.length) return;
+  selectTrack(trackIndex>=tracks.length-1 ? 0 : trackIndex+1);
+});
+btnList.addEventListener("click", ()=>{
+  listOn = !listOn;
+  panelLists.classList.toggle("hidden", !listOn);
+});
+btnJP.addEventListener("click", ()=>{
+  jpOn = !jpOn;
+  btnJP.textContent = "JP: " + (jpOn ? "ON":"OFF");
+  btnJP.className = "pill " + (jpOn ? "on":"off");
+  renderLyrics();
+  if (currentLineIndex>=0 && currentLines[currentLineIndex]) highlightLine(currentLineIndex);
+});
+
 audioEl.addEventListener("play", startSync);
 audioEl.addEventListener("pause", stopSync);
-audioEl.addEventListener("ended", stopSync);
+audioEl.addEventListener("ended", ()=>{
+  // 1曲終わったら次の曲へ（ループ）
+  try{ stopSync(); }catch(e){}
+  if (!tracks.length) return;
 
-// initial UI
-setStatus("JS OK (v1.3 NO-SW)");
-setAudState();
+  const next = (trackIndex>=tracks.length-1) ? 0 : (trackIndex+1);
+  selectTrack(next);
+
+  // 再生継続（環境により自動再生がブロックされる場合あり）
+  try{
+    const p = audioEl.play();
+    if (p && p.catch){
+      p.catch((err)=>{
+        setStatus("AUTO NEXT BLOCKED（PLAYを押してください）");
+      });
+    }
+  }catch(e){
+    setStatus("AUTO NEXT BLOCKED（PLAYを押してください）");
+  }
+});
+
+
+wordChipsEl.addEventListener("click", (e)=>{
+  const t = e.target;
+  if (!t) return;
+  const w = t.dataset ? t.dataset.w : "";
+  if (!w) return;
+  const ex = (currentLineIndex>=0 && currentLines[currentLineIndex]) ? currentLines[currentLineIndex].en : "";
+  toast("SEND → TANGO-CHO: " + w);
+  sendToTangoCho(w, ex);
+});
+
+window.addEventListener("error", (ev)=>{
+  try{
+    setStatus("APP ERROR: " + (ev && ev.message ? ev.message : "unknown"));
+  }catch(e){}
+});
+window.addEventListener("unhandledrejection", (ev)=>{
+  try{
+    setStatus("APP ERROR: " + (ev && ev.reason ? (ev.reason.name||ev.reason.message||String(ev.reason)) : "promise"));
+  }catch(e){}
+});
+
+// init
+setStatus("JS OK (deepl2h / sw-kill + lyric reset)");
+setCur("","");
+renderWordChips("");
 renderTrackList();
 renderLyricList();
 
