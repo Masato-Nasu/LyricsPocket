@@ -27,6 +27,7 @@
 
 ---
 
+
 ## まず準備するもの（初心者向け）
 
 LyricsPocket 自体は「Webページ」なので、**アプリ用のファイル**と、使うときに読み込む **音源／歌詞ファイル**の2種類を用意します。
@@ -87,7 +88,6 @@ LyricsPocket は、**音源ファイル名と歌詞ファイル名**を見て自
 2. **`LYRICSを選ぶ`** を押して、`.lrc` または `.txt` を選択（複数OK）
 3. `PLAY` で再生
 4. LRCの場合：再生位置に合わせて現在行がハイライトされます  
-   - ※再生に合わせて **画面が勝手にスクロールはしません**
 5. `JP: ON` で日本語訳を表示（ネット接続が必要）
 6. 英単語（WORDS）をタップして **TANGO-CHO** へ送る  
    - その単語＋今の歌詞行（例文）を渡します
@@ -109,69 +109,6 @@ iPhone（Safari / ホーム画面PWA）では、LyricsPocketは **勝手にTANGO
 ### 曲と歌詞が一致しないとき（手動で合わせる）
 - まず `TRACKS` から曲を選ぶ
 - 次に `LYRICS` 一覧から該当の歌詞を選ぶ
-
----
-
-## このリポジトリに入っているファイル（開発・設置向け）
-
-> 基本的に **同じフォルダ（リポジトリ直下）** に以下を置けばOKです。
-
-- `index.html` … アプリ本体（UI/ロジックが入っています）
-- `manifest.webmanifest` … PWA用の設定
-- `sw.js` … **自爆するSW（復旧用）**  
-  ※通常運用で Service Worker を登録しない設計です
-- `kill-sw.html` … キャッシュ／Service Worker を掃除してから `index.html` に戻すページ
-- `rescue.html` … 白画面・反映不良などの緊急用リセットページ
-- `screenshot1.png` … README用スクショ（任意）
-- `README.md` … この説明
-
----
-
-## ローカルで動かす方法（初心者向け）
-
-### 1) いちばん簡単：ローカルサーバーを立てる（推奨）
-ブラウザの制約（特に翻訳APIや一部機能）を避けるため、`file://` 直開きより **HTTPで開く**のが安全です。
-
-#### A. Python がある場合（Windows/Mac）
-プロジェクトのフォルダでターミナルを開いて：
-
-```bash
-python -m http.server 8000
-```
-
-次にブラウザで `http://localhost:8000/` を開きます。
-
-#### B. VS Code の Live Server を使う
-- VS Code 拡張「Live Server」を入れる
-- `index.html` を右クリック → `Open with Live Server`
-
-### 2) 動作確認のポイント
-- 音源ファイルを選べるか（AUDIO）
-- 歌詞ファイルを選べるか（LYRICS）
-- `JP: ON` で翻訳が表示されるか（ネット環境に依存）
-
----
-
-## GitHub Pages に公開する方法（初心者向け）
-
-1. GitHubで新規リポジトリを作る（例：`LyricsPocket`）
-2. このプロジェクトのファイル一式を **リポジトリ直下**にアップロードしてコミット
-3. GitHubの `Settings` → `Pages`
-4. `Build and deployment` で
-   - `Source: Deploy from a branch`
-   - `Branch: main`（または master） / `/(root)` を選択
-5. 表示されたURL（`https://<user>.github.io/<repo>/`）にアクセス
-
----
-
-## 反映されない・白画面になるとき（キャッシュ対策）
-
-GitHub Pages や iPhone のPWAは、更新が反映されず「古い版」が残ることがあります。
-
-1. まず **シークレット/プライベート**で開いて確認
-2. それでもダメなら、次を開いてください：
-   - `kill-sw.html`（軽いリセット）
-   - `rescue.html`（強めのリセット）
 
 ---
 
