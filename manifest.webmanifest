@@ -1,7 +1,7 @@
 {
   "name": "LyricsPocket v1.3 NO-SW",
   "short_name": "LyricsPocket",
-  "start_url": "./index.html?v=deepl2m",
+  "start_url": "./index.html?v=deepl2n",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
